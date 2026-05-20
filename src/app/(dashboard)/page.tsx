@@ -19,6 +19,14 @@ export default async function DashboardPage() {
     .eq('user_id', user!.id)
     .order('created_at', { ascending: false });
 
+  const { data: latestAnalysis } = await supabase
+    .from('ai_analyses')
+    .select('id, analysis_type, output_markdown, model, created_at')
+    .eq('user_id', user!.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   if (!accounts || accounts.length === 0) {
     return (
       <div
@@ -48,6 +56,70 @@ export default async function DashboardPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {accounts && accounts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Eyebrow>AI · CEA MAI RECENTĂ ANALIZĂ</Eyebrow>
+            <Link
+              href="/analyses"
+              style={{
+                fontFamily: 'var(--font-jetbrains-mono)',
+                fontSize: 11,
+                color: colors.accentLime,
+                textDecoration: 'none',
+              }}
+            >
+              VEZI TOATE →
+            </Link>
+          </div>
+          {latestAnalysis ? (
+            <Link href={`/analyses/${latestAnalysis.id}`} style={{ textDecoration: 'none' }}>
+              <div
+                style={{
+                  background: colors.bgCard,
+                  border: `1px solid ${colors.borderDefault}`,
+                  borderRadius: 6,
+                  padding: '16px 20px',
+                }}
+              >
+                <Mono tone="muted">
+                  {new Date(latestAnalysis.created_at).toLocaleString('ro-RO')} ·{' '}
+                  {latestAnalysis.model}
+                </Mono>
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: colors.textSecondary,
+                    fontFamily: 'var(--font-inter)',
+                    fontSize: 14,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {latestAnalysis.output_markdown.slice(0, 300)}...
+                </div>
+              </div>
+            </Link>
+          ) : (
+            <Link href="/analyses" style={{ textDecoration: 'none' }}>
+              <div
+                style={{
+                  background: colors.bgCard,
+                  border: `1px solid ${colors.borderDefault}`,
+                  borderRadius: 6,
+                  padding: '16px 20px',
+                  textAlign: 'center',
+                }}
+              >
+                <Mono tone="lime">RULEAZĂ PRIMA ANALIZĂ →</Mono>
+              </div>
+            </Link>
+          )}
+        </div>
+      )}
+
       <div>
         <Eyebrow>DASHBOARD · CONTURI</Eyebrow>
         <div style={{ marginTop: 8 }}>
