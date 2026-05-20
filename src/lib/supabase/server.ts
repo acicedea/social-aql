@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 export async function createSupabaseServerClient() {
@@ -45,4 +46,11 @@ export async function createSupabaseRouteHandlerClient() {
       },
     }
   );
+}
+
+export function createSupabaseServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY not set');
+  return createClient(url, key);
 }
