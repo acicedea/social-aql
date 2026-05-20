@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { mockProvider } from '@/providers/mock';
 import { encryptJson } from '@/lib/crypto';
 import { syncAccount } from '@/lib/sync/sync-account';
+import { metaInstagramProvider } from '@/providers/meta-instagram';
 
 export async function connectMockProvider() {
   const supabase = await createSupabaseServerClient();
@@ -49,4 +50,18 @@ export async function connectMockProvider() {
   }
 
   redirect('/accounts');
+}
+
+export async function getMetaAuthUrl(): Promise<string> {
+  const { cookies } = await import('next/headers');
+  const { randomBytes } = await import('crypto');
+  const state = randomBytes(16).toString('hex');
+  const cookieStore = await cookies();
+  cookieStore.set('meta_oauth_state', state, { httpOnly: true, maxAge: 600 });
+  return metaInstagramProvider.buildAuthUrl({
+    state,
+    redirectUri:
+      process.env.META_REDIRECT_URI ??
+      `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback/meta`,
+  });
 }

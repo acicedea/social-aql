@@ -11,6 +11,10 @@ const envSchema = z.object({
   AI_DEFAULT_TIER: z.enum(['batch', 'deep']).optional(),
   CRON_SECRET: z.string().min(1).optional(),
   NEXT_PUBLIC_ENABLE_MOCK_PROVIDER: z.string().optional(),
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_GRAPH_API_VERSION: z.string().optional(),
+  META_REDIRECT_URI: z.string().url().optional(),
 });
 
 export const env = envSchema.parse({
@@ -24,4 +28,8 @@ export const env = envSchema.parse({
   AI_DEFAULT_TIER: process.env.AI_DEFAULT_TIER,
   CRON_SECRET: process.env.CRON_SECRET,
   NEXT_PUBLIC_ENABLE_MOCK_PROVIDER: process.env.NEXT_PUBLIC_ENABLE_MOCK_PROVIDER,
+  META_APP_ID: process.env.META_APP_ID,
+  META_APP_SECRET: process.env.META_APP_SECRET,
+  META_GRAPH_API_VERSION: process.env.META_GRAPH_API_VERSION,
+  META_REDIRECT_URI: process.env.META_REDIRECT_URI,
 });
