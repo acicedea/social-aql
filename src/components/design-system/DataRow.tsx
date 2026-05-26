@@ -8,9 +8,10 @@ interface DataRowProps {
   description: React.ReactNode;
   status: string;
   tone: 'positive' | 'negative' | 'neutral';
+  action?: React.ReactNode;
 }
 
-export function DataRow({ label, description, status, tone }: DataRowProps) {
+export function DataRow({ label, description, status, tone, action }: DataRowProps) {
   const accentColor = tone === 'positive' ? colors.accentLime : tone === 'neutral' ? colors.textSecondary : colors.accentCoral;
 
   return (
@@ -82,6 +83,8 @@ export function DataRow({ label, description, status, tone }: DataRowProps) {
         >
           {status}
         </span>
+        {/* Action (optional) */}
+        {action}
       </div>
     </div>
   );
