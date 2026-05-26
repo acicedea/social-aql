@@ -8,15 +8,15 @@ const GRAPH_VERSION = () => process.env.META_GRAPH_API_VERSION ?? 'v21.0';
 const BASE = () => `https://graph.facebook.com/${GRAPH_VERSION()}`;
 
 const SCOPES = [
-  'instagram_basic',
-  'instagram_manage_insights',
+  'instagram_business_basic',
+  'instagram_business_manage_insights',
   'pages_show_list',
   'pages_read_engagement',
   'business_management',
 ].join(',');
 
 export function buildAuthUrl(params: { state: string; redirectUri: string }): string {
-  const url = new URL('https://www.facebook.com/dialog/oauth');
+  const url = new URL(`https://www.facebook.com/${GRAPH_VERSION()}/dialog/oauth`);
   url.searchParams.set('client_id', APP_ID());
   url.searchParams.set('redirect_uri', params.redirectUri);
   url.searchParams.set('scope', SCOPES);
