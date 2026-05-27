@@ -18,7 +18,6 @@ const SINGLE_ITEM_SCHEMA = {
     // 'none' is the sentinel for "no secondary theme" — null/union types rejected by Gemini
     secondary_theme: { type: 'string', enum: [...THEME_ENUM_VALUES, 'none'] },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
-    reasoning: { type: 'string' },
   },
   required: ['primary_theme', 'secondary_theme', 'confidence'],
 };
@@ -144,7 +143,7 @@ export async function classifyThemesBatch(inputs: ClassifyInput[]): Promise<Them
   const result = await provider.generate({
     systemPrompt: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    maxTokens: 1024 + inputs.length * 128,
+    maxTokens: 2048 + inputs.length * 256,
     temperature: 0.1,
     jsonMode: true,
     responseSchema: BATCH_RESPONSE_SCHEMA,
