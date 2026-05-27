@@ -5,10 +5,16 @@ import { Eyebrow, H2, Mono } from '@/components/design-system/Typography';
 import { colors } from '@/themes/ai-lichiditate/tokens';
 import { aiProviders } from '@/ai/registry';
 import { aiConfig } from '@/config/ai.config';
+import { BackfillThemesSection } from '@/components/dashboard/BackfillThemesSection';
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  const [{ count: totalPosts }, { count: classifiedPosts }] = await Promise.all([
+    supabase.from('posts').select('*', { count: 'exact', head: true }),
+    supabase.from('posts').select('*', { count: 'exact', head: true }).not('theme', 'is', null),
+  ]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 600 }}>
@@ -114,6 +120,15 @@ export default async function SettingsPage() {
             <Mono tone="lime">{aiConfig.defaultTier.toUpperCase()}</Mono>
           </div>
         </div>
+      </div>
+      <div>
+        <div style={{ marginTop: 32, marginBottom: 16 }}>
+          <H2>RE-CLASIFICARE TEME</H2>
+        </div>
+        <BackfillThemesSection
+          totalPosts={totalPosts ?? 0}
+          classifiedPosts={classifiedPosts ?? 0}
+        />
       </div>
     </div>
   );

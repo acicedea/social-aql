@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const platformSchema = z.enum(['meta', 'tiktok', 'x', 'youtube', 'linkedin', 'mock']);
+export const platformSchema = z.enum(['meta', 'tiktok', 'x', 'youtube', 'linkedin']);
 
 export const mediaTypeSchema = z.enum(['image', 'video', 'carousel', 'story', 'reel', 'text']);
 

@@ -79,7 +79,7 @@ export function AnalysisForm({ accounts, analyses, claudeAvailable }: Props) {
       <div style={{ padding: '16px 0' }}>
         <Mono tone="muted">
           NICIUN CONT CONECTAT.{' '}
-          <a href="/accounts" style={{ color: colors.accentLime }}>
+          <a href="/dashboard/accounts" style={{ color: colors.accentLime }}>
             CONECTEAZĂ UN CONT
           </a>
         </Mono>

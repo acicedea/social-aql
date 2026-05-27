@@ -1,5 +1,3 @@
-import type { z } from 'zod';
-
 export type AiTier = 'batch' | 'deep';
 
 export interface AiMessage {
@@ -19,11 +17,13 @@ export interface AiGenerateInput {
   messages: AiMessage[];
   maxTokens?: number;
   temperature?: number;
-  responseSchema?: z.ZodTypeAny;
+  jsonMode?: boolean;
+  responseSchema?: object;
 }
 
 export interface AiGenerateOutput {
   text: string;
+  parsed?: unknown;
   inputTokens: number;
   outputTokens: number;
   model: string;

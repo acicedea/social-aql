@@ -32,7 +32,7 @@ export default async function AnalysisDetailPage({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800 }}>
       <div>
         <Link
-          href="/analyses"
+          href="/dashboard/analyses"
           style={{
             color: colors.textMuted,
             fontFamily: 'var(--font-jetbrains-mono)',

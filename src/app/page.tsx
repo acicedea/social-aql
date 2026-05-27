@@ -33,7 +33,7 @@ export default async function Home() {
           width: '100%',
         }}
       >
-        <Eyebrow>AI LICHIDITATE · BETA</Eyebrow>
+        <Eyebrow>AI LICHIDITATE_aql · BETA</Eyebrow>
         <H1 accent={{ text: 'MATTERS', tone: 'lime' }}>
           THE ANALYSIS THAT MATTERS.
         </H1>
@@ -42,10 +42,7 @@ export default async function Home() {
         </Body>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 16 }}>
           <Link href="/login" style={{ textDecoration: 'none' }}>
-            <Button variant="primary">→ INTRĂ ÎN JOC</Button>
-          </Link>
-          <Link href="/design-system" style={{ textDecoration: 'none' }}>
-            <Button variant="ghost">→ DESIGN SYSTEM</Button>
+            <Button variant="primary">→ INTRĂ ÎN AQL</Button>
           </Link>
         </div>
       </div>

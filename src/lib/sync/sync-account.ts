@@ -1,7 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { decryptJson, encryptJson } from '@/lib/crypto';
-import { getProvider } from '@/providers/registry';
+import { getProviderClient } from '@/providers/registry';
 import type { ProviderToken } from '@/lib/normalized-types';
+import { calculatePostKpis } from '@/lib/kpis/calculate-post-kpis';
+import { detectTheme } from '@/lib/themes/detect-theme';
 
 export async function syncAccount(
   accountId: string,
@@ -23,7 +25,7 @@ export async function syncAccount(
   const token = decryptJson<ProviderToken>(account.encrypted_tokens);
 
   // 3. Look up provider
-  const provider = getProvider(account.provider_id);
+  const provider = getProviderClient(account.provider_id);
   if (!provider) throw new Error(`Provider not found: ${account.provider_id}`);
 
   // 4. Refresh if expired
@@ -74,11 +76,19 @@ export async function syncAccount(
     });
     snapshotsInserted++;
 
+    const currentFollowers = accountMetrics.followers;
+
     // 7. List posts
     const posts = await provider.listPosts(activeToken, account.external_account_id, range);
 
     for (const post of posts) {
-      // 8. Upsert post
+      // 8. Detect theme
+      const themeResult = await detectTheme({
+        caption: post.caption,
+        hashtags: post.hashtags,
+      });
+
+      // 9. Upsert post
       const { data: upsertedPost } = await supabase
         .from('posts')
         .upsert(
@@ -94,6 +104,10 @@ export async function syncAccount(
             hashtags: post.hashtags,
             mentions: post.mentions,
             raw: post.raw ?? null,
+            theme: themeResult.theme,
+            theme_secondary: themeResult.themeSecondary,
+            theme_confidence: themeResult.confidence,
+            followers_at_publish: currentFollowers,
           },
           { onConflict: 'account_id,external_post_id' }
         )
@@ -104,6 +118,20 @@ export async function syncAccount(
 
       if (upsertedPost) {
         const postMetrics = await provider.fetchPostMetrics(activeToken, post.externalId);
+
+        const kpis = calculatePostKpis({
+          impressions: postMetrics.impressions,
+          reach: postMetrics.reach,
+          likes: postMetrics.likes,
+          comments: postMetrics.comments,
+          shares: postMetrics.shares,
+          saves: postMetrics.saves,
+          videoViews: postMetrics.videoViews,
+          watchTimeSeconds: postMetrics.watchTimeSeconds,
+          mediaType: post.mediaType,
+          followersAtPublish: currentFollowers,
+        });
+
         await supabase.from('post_metrics_snapshots').insert({
           post_id: upsertedPost.id,
           captured_at: postMetrics.capturedAt,
@@ -117,18 +145,26 @@ export async function syncAccount(
           watch_time_seconds: postMetrics.watchTimeSeconds,
           engagement_rate: postMetrics.engagementRate,
           raw: postMetrics.raw ?? null,
+          er_by_reach: kpis.erByReach,
+          saves_per_reach: kpis.savesPerReach,
+          sends_per_reach: kpis.sendsPerReach,
+          likes_per_reach: kpis.likesPerReach,
+          save_to_like_ratio: kpis.saveToLikeRatio,
+          reach_rate: kpis.reachRate,
+          completion_rate: kpis.completionRate,
+          avg_watch_time_seconds: kpis.avgWatchTimeSeconds,
         });
         snapshotsInserted++;
       }
     }
 
-    // 9. Update last_sync_at
+    // 10. Update last_sync_at
     await supabase
       .from('accounts')
       .update({ last_sync_at: now, last_sync_error: null })
       .eq('id', accountId);
 
-    // 10. Mark job success
+    // 11. Mark job success
     if (job) {
       await supabase
         .from('sync_jobs')

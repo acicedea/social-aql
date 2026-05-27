@@ -6,7 +6,7 @@ export { antdTheme };
 
 export const aiLichiditateTheme = {
   id: 'ai-lichiditate' as const,
-  displayName: 'AI Lichiditate',
+  displayName: 'AI Lichiditate_aql',
   tokens: { colors, spacing, typography },
   antdTheme,
   cssVariables: buildCssVariables(colors),

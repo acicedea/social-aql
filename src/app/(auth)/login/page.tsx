@@ -96,8 +96,8 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 32 }}>
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Eyebrow>AI LICHIDITATE · ACCESS</Eyebrow>
-          <H1 accent={{ text: 'JOC', tone: 'lime' }}>INTRĂ ÎN JOC.</H1>
+          <Eyebrow>AI LICHIDITATE_aql · ACCESS</Eyebrow>
+          <H1 accent={{ text: 'AQL', tone: 'lime' }}>INTRĂ ÎN AQL.</H1>
         </div>
 
         {magicSent ? (

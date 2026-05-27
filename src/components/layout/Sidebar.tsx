@@ -4,14 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { colors } from '@/themes/ai-lichiditate/tokens';
-import { signOut } from '@/app/(dashboard)/actions';
+import { signOut } from '@/app/dashboard/actions';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/accounts', label: 'Conturi' },
-  { href: '/posts', label: 'Postări' },
-  { href: '/analyses', label: 'Analize' },
-  { href: '/settings', label: 'Setări' },
+  { href: '/dashboard/accounts', label: 'Conturi' },
+  { href: '/dashboard/posts', label: 'Postări' },
+  { href: '/dashboard/analyses', label: 'Analize' },
+  { href: '/dashboard/settings', label: 'Setări' },
 ];
 
 interface SidebarProps {
@@ -52,7 +52,7 @@ export function Sidebar({ userEmail }: SidebarProps) {
             color: colors.textPrimary,
           }}
         >
-          AI LICHIDITATE
+          AI LICHIDITATE_aql
         </span>
       </div>
 

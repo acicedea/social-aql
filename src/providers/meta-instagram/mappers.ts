@@ -60,8 +60,22 @@ export function mapPostMetrics(
   const likes = insightValues['likes'] ?? null;
   const comments = insightValues['comments'] ?? null;
   const shares = insightValues['shares'] ?? null;
-  const saves = insightValues['saved'] ?? null;
+  // Meta uses 'saved' in most endpoints
+  const saves = insightValues['saved'] ?? insightValues['saves'] ?? null;
   const reach = insightValues['reach'] ?? null;
+
+  // 'impressions' deprecated in v22; use 'views' instead
+  const impressions = insightValues['views'] ?? insightValues['impressions'] ?? null;
+
+  // Watch time from Meta is in milliseconds; convert to seconds
+  const watchTimeMs = insightValues['ig_reels_video_view_total_time'] ?? null;
+  const watchTimeSeconds = watchTimeMs != null ? Math.round(watchTimeMs / 1000) : null;
+
+  const videoViews =
+    insightValues['ig_reels_aggregated_all_plays_count'] ??
+    insightValues['video_views'] ??
+    insightValues['views'] ??
+    null;
 
   let engagementRate: number | null = null;
   if (reach && reach > 0) {
@@ -72,14 +86,14 @@ export function mapPostMetrics(
   return {
     postExternalId,
     capturedAt: new Date().toISOString(),
-    impressions: insightValues['impressions'] ?? null,
+    impressions,
     reach,
     likes,
     comments,
     shares,
     saves,
-    videoViews: insightValues['video_views'] ?? insightValues['plays'] ?? null,
-    watchTimeSeconds: null,
+    videoViews,
+    watchTimeSeconds,
     engagementRate,
     raw: insightValues as unknown as Record<string, unknown>,
   };

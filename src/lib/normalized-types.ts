@@ -1,4 +1,4 @@
-export type Platform = 'meta' | 'tiktok' | 'x' | 'youtube' | 'linkedin' | 'mock';
+export type Platform = 'meta' | 'tiktok' | 'x' | 'youtube' | 'linkedin';
 
 export type MediaType = 'image' | 'video' | 'carousel' | 'story' | 'reel' | 'text';
 

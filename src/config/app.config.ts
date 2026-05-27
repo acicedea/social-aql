@@ -1,5 +1,5 @@
 export const appConfig = {
-  name: 'AI LICHIDITATE',
+  name: 'AI LICHIDITATE_aql',
   description: 'Smart money positioning for content.',
   locale: 'ro',
   defaultDateRangeDays: 30,

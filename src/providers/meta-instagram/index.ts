@@ -1,4 +1,5 @@
-import type { SocialProvider, OAuthConfig } from '@/providers/types';
+import 'server-only';
+import type { ProviderClient } from '@/providers/types';
 import type {
   ProviderToken,
   NormalizedAccount,
@@ -18,33 +19,14 @@ import { graphRequest, requestPaginated } from './graph-client';
 import { mapAccount, mapPost, mapPostMetrics, mapAccountMetrics } from './mappers';
 import { POST_METRICS_BY_TYPE, ACCOUNT_METRICS } from './insights-config';
 import type { GraphPage, GraphIgAccount, GraphMedia, GraphInsight } from './types';
-
-const oauth: OAuthConfig = {
-  authUrl: 'https://www.facebook.com/dialog/oauth',
-  tokenUrl: 'https://graph.facebook.com/oauth/access_token',
-  scopes: [
-    'instagram_basic',
-    'instagram_manage_insights',
-    'pages_show_list',
-    'pages_read_engagement',
-    'business_management',
-  ],
-  redirectPath: '/auth/callback/meta',
-  requiresPkce: false,
-};
+import { META_INSTAGRAM_PROVIDER_MANIFEST } from './manifest';
 
 function getBundle(token: ProviderToken): MetaTokenBundle {
   return token.raw as unknown as MetaTokenBundle;
 }
 
-export const metaInstagramProvider: SocialProvider = {
-  id: 'meta-instagram',
-  platform: 'meta',
-  displayName: 'Instagram',
-  description:
-    'Conectează contul tău Instagram Business sau Creator via Meta Graph API.',
-  iconUrl: null,
-  oauth,
+export const metaInstagramProvider: ProviderClient = {
+  manifest: META_INSTAGRAM_PROVIDER_MANIFEST,
 
   buildAuthUrl(params: { state: string; redirectUri: string }): string {
     return buildAuthUrl(params);
@@ -164,7 +146,6 @@ export const metaInstagramProvider: SocialProvider = {
   ): Promise<NormalizedPostMetrics> {
     const bundle = getBundle(token);
 
-    // Determine media type first
     const mediaInfo = await graphRequest<{
       media_type: string;
       media_product_type?: string;
@@ -187,7 +168,6 @@ export const metaInstagramProvider: SocialProvider = {
 
     const metricsList = POST_METRICS_BY_TYPE[typeKey] ?? POST_METRICS_BY_TYPE['IMAGE'];
 
-    // Fetch metrics — try bulk first, fall back to individual
     const values: Record<string, number | null> = {};
     try {
       const res = await graphRequest<{
@@ -201,7 +181,6 @@ export const metaInstagramProvider: SocialProvider = {
         values[insight.name] = insight.values[0]?.value ?? null;
       }
     } catch {
-      // Partial failure — try metrics individually
       for (const metric of metricsList) {
         try {
           const res = await graphRequest<{

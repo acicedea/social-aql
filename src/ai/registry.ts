@@ -19,3 +19,7 @@ export function getProviderForTier(tier: AiTier): AiProvider {
   }
   return provider;
 }
+
+export function getDefaultAiProvider(): AiProvider {
+  return getProviderForTier('batch');
+}

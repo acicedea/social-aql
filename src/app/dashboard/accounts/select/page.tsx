@@ -23,11 +23,11 @@ async function selectAccount(formData: FormData) {
   const expiresAt = cookieStore.get('meta_pending_expires')?.value;
 
   if (!accountsRaw || !userToken || !externalId)
-    redirect('/accounts?error=meta_select_failed');
+    redirect('/dashboard/accounts?error=meta_select_failed');
 
   const accounts: AccountOption[] = JSON.parse(accountsRaw);
   const chosen = accounts.find((a) => a.externalId === externalId);
-  if (!chosen) redirect('/accounts?error=meta_select_invalid');
+  if (!chosen) redirect('/dashboard/accounts?error=meta_select_invalid');
 
   const token = await buildTokenForPage(
     userToken,
@@ -59,13 +59,13 @@ async function selectAccount(formData: FormData) {
   cookieStore.delete('meta_pending_user_token');
   cookieStore.delete('meta_pending_expires');
 
-  redirect('/accounts');
+  redirect('/dashboard/accounts');
 }
 
 export default async function AccountSelectPage() {
   const cookieStore = await cookies();
   const accountsRaw = cookieStore.get('meta_pending_accounts')?.value;
-  if (!accountsRaw) redirect('/accounts');
+  if (!accountsRaw) redirect('/dashboard/accounts');
 
   const accounts: AccountOption[] = JSON.parse(accountsRaw);
 

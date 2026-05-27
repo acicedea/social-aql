@@ -7,6 +7,11 @@ import { Eyebrow, H1, Body, Mono } from '@/components/design-system/Typography';
 import { Button } from '@/components/design-system/Button';
 import { Card } from '@/components/design-system/Card';
 import { DataRow } from '@/components/design-system/DataRow';
+import { KpiCard } from '@/components/dashboard/KpiCard';
+import { TopPostsWidget } from '@/components/dashboard/TopPostsWidget';
+import { BENCHMARKS, classifyKpi } from '@/lib/kpis/benchmarks';
+import { formatKpiPercent, formatLargeNumber, formatDelta } from '@/lib/kpis/formatters';
+import type { TopPost } from '@/components/dashboard/TopPostsWidget';
 
 function relativeTime(isoString: string | null): string {
   if (!isoString) return 'Nicio sincronizare încă';
@@ -18,6 +23,16 @@ function relativeTime(isoString: string | null): string {
   if (hrs < 24) return `Acum ${hrs} or${hrs === 1 ? 'ă' : 'e'}`;
   const days = Math.floor(hrs / 24);
   return `Acum ${days} zi${days === 1 ? '' : 'le'}`;
+}
+
+function avg(values: Array<number | null>): number | null {
+  const nums = values.filter((v): v is number => v != null);
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function dayKey(isoDate: string): string {
+  return isoDate.slice(0, 10);
 }
 
 export default async function DashboardPage() {
@@ -41,12 +56,7 @@ export default async function DashboardPage() {
     const { count } = await supabase
       .from('posts')
       .select('id', { count: 'exact', head: true })
-      .in(
-        'account_id',
-        accountIds.length > 0
-          ? accountIds
-          : ['00000000-0000-0000-0000-000000000000']
-      );
+      .in('account_id', accountIds.length > 0 ? accountIds : ['00000000-0000-0000-0000-000000000000']);
     postCount = count ?? 0;
   }
 
@@ -140,101 +150,220 @@ export default async function DashboardPage() {
     );
   }
 
-  // State C: accounts + posts
-  const postCountsByAccount: Record<string, number> = {};
-  for (const acc of accounts ?? []) {
-    const { count } = await supabase
-      .from('posts')
-      .select('id', { count: 'exact', head: true })
-      .eq('account_id', acc.id)
-      .gte(
-        'published_at',
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      );
-    postCountsByAccount[acc.id] = count ?? 0;
-  }
+  // State C: accounts + posts — fetch KPI data
+  const accountIds = (accounts ?? []).map((a) => a.id);
+  const safeAccountIds = accountIds.length > 0 ? accountIds : ['00000000-0000-0000-0000-000000000000'];
 
-  const followersByAccount: Record<string, number | null> = {};
-  for (const acc of accounts ?? []) {
-    const { data: snap } = await supabase
-      .from('account_metrics_snapshots')
-      .select('followers')
-      .eq('account_id', acc.id)
-      .order('captured_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    followersByAccount[acc.id] = snap?.followers ?? null;
+  const now30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const now60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Fetch posts with latest metrics for last 30 days
+  const { data: recentPosts } = await supabase
+    .from('posts_with_latest_metrics')
+    .select('*')
+    .in('account_id', safeAccountIds)
+    .gte('published_at', now30)
+    .order('published_at', { ascending: false })
+    .limit(200);
+
+  // Fetch posts for previous 30 days (for delta)
+  const { data: prevPosts } = await supabase
+    .from('posts_with_latest_metrics')
+    .select('er_by_reach, saves_per_reach, sends_per_reach')
+    .in('account_id', safeAccountIds)
+    .gte('published_at', now60)
+    .lt('published_at', now30)
+    .limit(200);
+
+  const posts30 = recentPosts ?? [];
+  const posts60 = prevPosts ?? [];
+
+  // Aggregate KPIs
+  const avgEr30 = avg(posts30.map((p) => p.er_by_reach));
+  const avgSaves30 = avg(posts30.map((p) => p.saves_per_reach));
+  const avgSends30 = avg(posts30.map((p) => p.sends_per_reach));
+  const avgEr60 = avg(posts60.map((p: { er_by_reach: number | null }) => p.er_by_reach));
+  const avgSaves60 = avg(posts60.map((p: { saves_per_reach: number | null }) => p.saves_per_reach));
+  const avgSends60 = avg(posts60.map((p: { sends_per_reach: number | null }) => p.sends_per_reach));
+
+  // Follower data
+  const { data: followerSnap } = await supabase
+    .from('account_metrics_snapshots')
+    .select('followers, captured_at')
+    .in('account_id', safeAccountIds)
+    .order('captured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: prevFollowerSnap } = await supabase
+    .from('account_metrics_snapshots')
+    .select('followers')
+    .in('account_id', safeAccountIds)
+    .lte('captured_at', now30)
+    .order('captured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const currentFollowers = followerSnap?.followers ?? null;
+  const prevFollowers = prevFollowerSnap?.followers ?? null;
+
+  // Sparkline: daily avg er_by_reach for last 30 days
+  const dailyEr: Record<string, number[]> = {};
+  for (const p of posts30) {
+    if (p.er_by_reach == null || !p.published_at) continue;
+    const key = dayKey(p.published_at);
+    if (!dailyEr[key]) dailyEr[key] = [];
+    dailyEr[key].push(p.er_by_reach);
   }
+  const sparklineEr = Object.values(dailyEr).map((vals) => avg(vals) ?? 0);
+
+  const dailySaves: Record<string, number[]> = {};
+  for (const p of posts30) {
+    if (p.saves_per_reach == null || !p.published_at) continue;
+    const key = dayKey(p.published_at);
+    if (!dailySaves[key]) dailySaves[key] = [];
+    dailySaves[key].push(p.saves_per_reach);
+  }
+  const sparklineSaves = Object.values(dailySaves).map((vals) => avg(vals) ?? 0);
+
+  // Top posts by saves_per_reach and sends_per_reach
+  const topBySaves: TopPost[] = [...posts30]
+    .filter((p) => p.saves_per_reach != null)
+    .sort((a, b) => (b.saves_per_reach ?? 0) - (a.saves_per_reach ?? 0))
+    .slice(0, 5)
+    .map((p) => ({
+      id: p.id,
+      caption: p.caption,
+      media_type: p.media_type,
+      published_at: p.published_at,
+      theme: p.theme,
+      saves_per_reach: p.saves_per_reach,
+      sends_per_reach: p.sends_per_reach,
+      er_by_reach: p.er_by_reach,
+      reach: p.reach,
+    }));
+
+  const topBySends: TopPost[] = [...posts30]
+    .filter((p) => p.sends_per_reach != null)
+    .sort((a, b) => (b.sends_per_reach ?? 0) - (a.sends_per_reach ?? 0))
+    .slice(0, 5)
+    .map((p) => ({
+      id: p.id,
+      caption: p.caption,
+      media_type: p.media_type,
+      published_at: p.published_at,
+      theme: p.theme,
+      saves_per_reach: p.saves_per_reach,
+      sends_per_reach: p.sends_per_reach,
+      er_by_reach: p.er_by_reach,
+      reach: p.reach,
+    }));
+
+  // Theme distribution
+  const themeCounts: Record<string, number> = {};
+  for (const p of posts30) {
+    const t = p.theme ?? 'other';
+    themeCounts[t] = (themeCounts[t] ?? 0) + 1;
+  }
+  const themeEntries = Object.entries(themeCounts).sort((a, b) => b[1] - a[1]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
       <div>
-        <Eyebrow>DASHBOARD · OVERVIEW</Eyebrow>
+        <Eyebrow>DASHBOARD · OVERVIEW · ULTIMELE 30 ZILE</Eyebrow>
         <div style={{ marginTop: 8 }}>
           <H1>OVERVIEW.</H1>
         </div>
       </div>
 
+      {/* Row 1: 4 KPI cards */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
           gap: 16,
         }}
       >
-        {(accounts ?? []).map((account) => (
-          <Card key={account.id} variant="default">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <Eyebrow tone="lime">{account.handle ?? account.display_name}</Eyebrow>
-                <div style={{ marginTop: 4 }}>
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-league-spartan), sans-serif',
-                      fontSize: 20,
-                      fontWeight: 700,
-                      color: colors.textPrimary,
-                    }}
-                  >
-                    {account.display_name}
-                  </span>
-                </div>
-              </div>
+        <KpiCard
+          eyebrow="BY REACH · ULTIMELE 30 ZILE"
+          label="ENGAGEMENT RATE"
+          value={formatKpiPercent(avgEr30)}
+          delta={formatDelta(avgEr30, avgEr60)}
+          tier={classifyKpi(avgEr30, BENCHMARKS.erByReach)}
+          benchmark={BENCHMARKS.erByReach}
+          sparklineData={sparklineEr}
+        />
+        <KpiCard
+          eyebrow="SAVES / REACH · ULTIMELE 30 ZILE"
+          label="SAVE RATE"
+          value={formatKpiPercent(avgSaves30)}
+          delta={formatDelta(avgSaves30, avgSaves60)}
+          tier={classifyKpi(avgSaves30, BENCHMARKS.savesPerReach)}
+          benchmark={BENCHMARKS.savesPerReach}
+          sparklineData={sparklineSaves}
+        />
+        <KpiCard
+          eyebrow="SHARES / REACH · ULTIMELE 30 ZILE"
+          label="SEND RATE"
+          value={formatKpiPercent(avgSends30)}
+          delta={formatDelta(avgSends30, avgSends60)}
+          tier={classifyKpi(avgSends30, BENCHMARKS.sendsPerReach)}
+          benchmark={BENCHMARKS.sendsPerReach}
+        />
+        <KpiCard
+          eyebrow="URMĂRITORI ACTUALI"
+          label="URMĂRITORI"
+          value={formatLargeNumber(currentFollowers)}
+          delta={formatDelta(currentFollowers, prevFollowers)}
+        />
+      </div>
 
-              <div style={{ display: 'flex', gap: 24 }}>
-                <div>
-                  <Mono tone="muted">POSTĂRI (30Z)</Mono>
-                  <div>
-                    <Mono tone="lime">
-                      {postCountsByAccount[account.id] ?? 0}
-                    </Mono>
-                  </div>
-                </div>
-                {followersByAccount[account.id] != null && (
-                  <div>
-                    <Mono tone="muted">URMĂRITORI</Mono>
-                    <div>
-                      <Mono tone="lime">
-                        {followersByAccount[account.id]!.toLocaleString('ro-RO')}
-                      </Mono>
-                    </div>
-                  </div>
-                )}
-              </div>
+      {/* Row 2: Top posts widgets */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 16,
+        }}
+      >
+        <TopPostsWidget posts={topBySaves} metricLabel="DUPĂ SAVE RATE" metricKey="saves_per_reach" />
+        <TopPostsWidget posts={topBySends} metricLabel="DUPĂ SEND RATE" metricKey="sends_per_reach" />
+      </div>
 
-              <span
+      {/* Row 3: Theme distribution */}
+      {themeEntries.length > 0 && (
+        <Card>
+          <Eyebrow tone="muted">TEME DETECTATE · ULTIMELE 30 ZILE</Eyebrow>
+          <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {themeEntries.map(([theme, count]) => (
+              <div
+                key={theme}
                 style={{
-                  fontFamily: 'var(--font-jetbrains-mono), monospace',
-                  fontSize: 10,
-                  color: 'var(--color-text-muted)',
+                  border: `1px solid ${colors.borderDefault}`,
+                  borderRadius: 4,
+                  padding: '4px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}
               >
-                {relativeTime(account.last_sync_at)}
-              </span>
-            </div>
-          </Card>
-        ))}
-      </div>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-jetbrains-mono), monospace',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: 'uppercase' as const,
+                    color: colors.accentLime,
+                  }}
+                >
+                  {theme.toUpperCase()}
+                </span>
+                <Mono tone="muted">{count} postări</Mono>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

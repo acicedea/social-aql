@@ -1,18 +1,16 @@
 import React from 'react';
 import { colors } from '@/themes/ai-lichiditate/tokens';
 import { Eyebrow, Body } from '@/components/design-system/Typography';
-import type { SocialProvider } from '@/providers/types';
+import type { ProviderManifest } from '@/providers/types';
 import { ConnectButton } from './ConnectButton';
 
 interface ProviderCardProps {
-  provider: SocialProvider;
+  provider: ProviderManifest;
+  onConnect: () => Promise<void>;
 }
 
-export function ProviderCard({ provider }: ProviderCardProps) {
-  const eyebrowTone = provider.oauth.isMock ? 'lime' : undefined;
-  const eyebrowText = provider.oauth.isMock
-    ? `MOCK · DEVELOPMENT`
-    : provider.platform.toUpperCase();
+export function ProviderCard({ provider, onConnect }: ProviderCardProps) {
+  const eyebrowText = provider.platform.toUpperCase();
 
   return (
     <div
@@ -27,7 +25,7 @@ export function ProviderCard({ provider }: ProviderCardProps) {
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Eyebrow tone={eyebrowTone}>{eyebrowText}</Eyebrow>
+        <Eyebrow>{eyebrowText}</Eyebrow>
         <span
           style={{
             fontFamily: 'var(--font-league-spartan), sans-serif',
@@ -41,7 +39,7 @@ export function ProviderCard({ provider }: ProviderCardProps) {
         </span>
         <Body tone="secondary">{provider.description}</Body>
       </div>
-      <ConnectButton provider={provider} />
+      <ConnectButton onConnect={onConnect} />
     </div>
   );
 }
