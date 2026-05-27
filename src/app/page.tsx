@@ -1,12 +1,15 @@
-'use client';
-
+import { redirect } from 'next/navigation';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import React from 'react';
 import Link from 'next/link';
 import { colors } from '@/themes/ai-lichiditate/tokens';
 import { Eyebrow, H1, Body } from '@/components/design-system/Typography';
 import { Button } from '@/components/design-system/Button';
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) redirect('/dashboard');
   return (
     <div
       style={{
