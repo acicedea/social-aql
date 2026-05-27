@@ -3,12 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { env } from '@/lib/env';
 
 export async function updateSession(request: NextRequest) {
-  console.log('[mw] entering for path:', request.nextUrl.pathname);
-  console.log(
-    '[mw] incoming cookies:',
-    request.cookies.getAll().map((c) => c.name).join(', ')
-  );
-
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -32,11 +26,7 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
-  console.log('[mw] getUser result:', {
-    userId: user?.id ?? null,
-    errorMessage: error?.message ?? null,
-  });
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }
