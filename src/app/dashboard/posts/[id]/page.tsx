@@ -9,7 +9,7 @@ import { Tag } from '@/components/design-system/Tag';
 import { PostKpiGrid } from '@/components/posts/PostKpiGrid';
 import { PostMetricsTimeline } from '@/components/posts/PostMetricsTimeline';
 import { formatLargeNumber } from '@/lib/kpis/formatters';
-import { extractHook, classifyHookType, countCaptionWords, detectSaveCta } from '@/lib/content-analysis/caption-utils';
+import { extractHook, classifyHookType, classifyCaptionLength, countCaptionWords, detectSaveCta } from '@/lib/content-analysis/caption-utils';
 import { runPostDiagnostics } from '@/lib/diagnostics/post-diagnostics';
 import { PostDiagnosticChecklist } from '@/components/posts/PostDiagnosticChecklist';
 import type { PostDiagnosticInput } from '@/lib/diagnostics/post-diagnostics';
@@ -108,7 +108,7 @@ export default async function PostDetailPage({
     captionWordCount: wordCount,
     hasSaveCta: detectSaveCta(post.caption),
     hashtagCount: hashtags.length,
-    captionLength: wordCount < 50 ? 'short' : wordCount < 150 ? 'medium' : 'long',
+    captionLength: classifyCaptionLength(post.caption),
     erByReach: post.er_by_reach ?? null,
     savesPerReach: post.saves_per_reach ?? null,
     sendsPerReach: post.sends_per_reach ?? null,
