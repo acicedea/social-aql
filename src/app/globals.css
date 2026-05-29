@@ -1,24 +1,5 @@
-/* ============================================================
-   CSS Variables
-   ============================================================ */
-:root {
-  --color-bg: #000000;
-  --color-bg-elevated: #0F0F0F;
-  --color-bg-card: #141414;
-  --color-bg-card-positive: #0E1A06;
-  --color-bg-card-negative: #1A0908;
-  --color-text-primary: #F2EFE4;
-  --color-text-secondary: #8A8A8A;
-  --color-text-muted: #5A5A5A;
-  --color-text-inverse: #000000;
-  --color-accent-lime: #C7F84C;
-  --color-accent-lime-dim: #7A9A2E;
-  --color-accent-coral: #FF5A4E;
-  --color-accent-coral-dim: #8C2F28;
-  --color-border-default: #262626;
-  --color-border-positive: #3A5C0F;
-  --color-border-negative: #5C1F1A;
-}
+/* CSS variables are injected on <html> from activeTheme.cssVariables in layout.tsx.
+   They read from fork-config.ts — do not hardcode them here. */
 
 /* ============================================================
    Reset
@@ -37,7 +18,7 @@ html, body {
 }
 
 body {
-  background: #000000;
+  background: var(--color-bg);
   color: var(--color-text-primary);
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
   font-feature-settings: 'tnum' 1, 'cv11' 1;
@@ -50,9 +31,9 @@ body {
    ============================================================ */
 ::-webkit-scrollbar {
   width: 6px;
-  background: #000000;
+  background: var(--color-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
+  background: var(--color-border-default);
   border-radius: 3px;
 }
