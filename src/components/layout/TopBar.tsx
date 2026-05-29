@@ -1,11 +1,17 @@
+'use client';
+
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { colors } from '@/themes/ai-lichiditate/tokens';
+import { DateRangePicker } from '@/components/dashboard/DateRangePicker';
 
 interface TopBarProps {
   title: string;
 }
 
 export function TopBar({ title }: TopBarProps) {
+  const pathname = usePathname();
+
   return (
     <header
       style={{
@@ -31,17 +37,7 @@ export function TopBar({ title }: TopBarProps) {
       >
         {title}
       </span>
-      <span
-        style={{
-          fontFamily: 'var(--font-jetbrains-mono), monospace',
-          fontSize: 11,
-          color: colors.textMuted,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}
-      >
-        LAST 30D
-      </span>
+      {pathname === '/dashboard' ? <DateRangePicker /> : null}
     </header>
   );
 }
