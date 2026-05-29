@@ -2,16 +2,17 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { aiConfig } from '@/config/ai.config';
-import { Eyebrow, Mono } from '@/components/design-system/Typography';
-import { AnalysisMarkdown } from '@/components/ai/AnalysisMarkdown';
+import { AnalysisDetail } from '@/components/analyses/AnalysisDetail';
 import { colors } from '@/themes/ai-lichiditate/tokens';
+import { Mono } from '@/components/design-system/Typography';
+import type { AnalysisType } from '@/ai/analyses/types';
 
 export default async function AnalysisDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -19,56 +20,53 @@ export default async function AnalysisDetailPage({
 
   const { data: analysis } = await supabase
     .from('ai_analyses')
-    .select('*')
-    .eq('id', params.id)
+    .select('id, analysis_type, status, structured_output, output_markdown, created_at, input_range_from, input_range_to, model, tokens_used, duration_ms, error_message')
+    .eq('id', id)
     .eq('user_id', user!.id)
     .single();
 
   if (!analysis) notFound();
 
-  const def = aiConfig.analyses[analysis.analysis_type];
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800 }}>
-      <div>
-        <Link
-          href="/dashboard/analyses"
-          style={{
-            color: colors.textMuted,
-            fontFamily: 'var(--font-jetbrains-mono)',
-            fontSize: 12,
-            textDecoration: 'none',
-          }}
-        >
+  if (analysis.status === 'failed') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <Link href="/dashboard/analyses" style={{ color: colors.textMuted, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 12, textDecoration: 'none' }}>
           ← ÎNAPOI LA ANALIZE
         </Link>
-        <div style={{ marginTop: 12 }}>
-          <Eyebrow tone="lime">{def?.displayName ?? analysis.analysis_type}</Eyebrow>
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 16 }}>
-          <Mono tone="muted">
-            {analysis.input_range_from?.slice(0, 10)} →{' '}
-            {analysis.input_range_to?.slice(0, 10)}
-          </Mono>
-          <Mono tone={analysis.model?.includes('claude') ? 'lime' : 'muted'}>
-            {analysis.model}
-          </Mono>
-          <Mono tone="muted">
-            {new Date(analysis.created_at).toLocaleString('ro-RO')}
-          </Mono>
-        </div>
+        <Mono tone="coral">ANALIZĂ EȘUATĂ: {analysis.error_message ?? 'Eroare necunoscută'}</Mono>
       </div>
+    );
+  }
 
-      <div
-        style={{
-          background: colors.bgCard,
-          border: `1px solid ${colors.borderDefault}`,
-          borderRadius: 6,
-          padding: '24px 28px',
-        }}
-      >
-        <AnalysisMarkdown markdown={analysis.output_markdown} />
+  if (!analysis.structured_output) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <Link href="/dashboard/analyses" style={{ color: colors.textMuted, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 12, textDecoration: 'none' }}>
+          ← ÎNAPOI LA ANALIZE
+        </Link>
+        <Mono tone="muted">ÎN CURS DE PROCESARE...</Mono>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <Link
+        href="/dashboard/analyses"
+        style={{ color: colors.textMuted, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 12, textDecoration: 'none' }}
+      >
+        ← ÎNAPOI LA ANALIZE
+      </Link>
+
+      <AnalysisDetail
+        analysisType={analysis.analysis_type as AnalysisType}
+        structuredOutput={analysis.structured_output}
+        createdAt={analysis.created_at}
+        rangeFrom={analysis.input_range_from?.slice(0, 10) ?? null}
+        rangeTo={analysis.input_range_to?.slice(0, 10) ?? null}
+        model={analysis.model}
+        durationMs={analysis.duration_ms}
+      />
     </div>
   );
 }

@@ -5,9 +5,9 @@ import type { AiProvider, AiGenerateInput, AiGenerateOutput } from '../types';
 
 export const geminiProvider: AiProvider = {
   id: 'gemini',
-  displayName: 'Gemini 2.5 Flash',
+  displayName: 'Gemini Flash',
   tier: 'batch',
-  model: 'gemini-2.5-flash',
+  model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
   supportsImages: true,
   costPerMillionInputTokens: 0,
   costPerMillionOutputTokens: 0,
@@ -34,6 +34,8 @@ export const geminiProvider: AiProvider = {
     };
     if (input.jsonMode) {
       generationConfig.responseMimeType = 'application/json';
+      // Disable thinking: it consumes the shared maxOutputTokens budget and truncates JSON output
+      generationConfig.thinkingConfig = { thinkingBudget: 0 };
     }
     if (input.responseSchema) {
       generationConfig.responseMimeType = 'application/json';
@@ -73,7 +75,7 @@ export const geminiProvider: AiProvider = {
       const candidatesCount = result.response.candidates?.length ?? 0;
 
       console.log('[gemini] response candidates:', candidatesCount);
-      console.log('[gemini] text length:', text.length, '· output tokens:', usage?.candidatesTokenCount ?? 0);
+      console.log('[gemini] finish reason:', finishReason, '· text length:', text.length, '· output tokens:', usage?.candidatesTokenCount ?? 0, '· thinking tokens:', (usage as unknown as Record<string, unknown>)?.thoughtsTokenCount ?? 'n/a');
 
       if (!text) {
         console.error('[gemini] empty response, candidates:', JSON.stringify(result.response.candidates).slice(0, 500));
@@ -85,7 +87,7 @@ export const geminiProvider: AiProvider = {
         try {
           parsed = JSON.parse(text);
         } catch {
-          console.error('[gemini] JSON parse failed. Response preview:', text.slice(0, 300));
+          console.error('[gemini] JSON parse failed. text.length:', text.length, '| last 300 chars:', text.slice(-300));
           throw new AiProviderError(`Gemini returned invalid JSON: ${text.slice(0, 200)}`, { retryable: false, rateLimited: false });
         }
       }
@@ -103,14 +105,15 @@ export const geminiProvider: AiProvider = {
       if (err instanceof AiProviderError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       const isRate = msg.includes('429') || msg.toLowerCase().includes('quota');
+      // Check rate first — 429 must never be misclassified as auth even if message mentions "api key"
+      if (isRate) {
+        console.warn('[gemini] rate limit hit:', msg);
+        throw new AiProviderError(`Gemini rate limit: ${msg}`, { retryable: true, rateLimited: true });
+      }
       const isAuth = msg.includes('401') || msg.includes('403') || msg.toLowerCase().includes('api key');
       if (isAuth) {
         console.error('[gemini] auth error:', msg);
         throw new AiProviderError(`Gemini auth failed (check API key): ${msg}`, { retryable: false, rateLimited: false });
-      }
-      if (isRate) {
-        console.warn('[gemini] rate limit hit:', msg);
-        throw new AiProviderError(`Gemini rate limit: ${msg}`, { retryable: true, rateLimited: true });
       }
       console.error('[gemini] error:', msg);
       throw new AiProviderError(`Gemini error: ${msg}`, { retryable: false, rateLimited: false });

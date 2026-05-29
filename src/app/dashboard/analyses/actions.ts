@@ -1,29 +1,40 @@
 'use server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { runAnalysis } from '@/lib/ai/run-analysis';
-import type { AiTier } from '@/ai/providers/types';
 
-export async function runAnalysisAction(params: {
-  accountId: string;
-  analysisType: string;
-  rangeFrom: string;
-  rangeTo: string;
-  overrideTier?: AiTier;
-}): Promise<{ analysisId: string }> {
+import { revalidatePath } from 'next/cache';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { runAnalysis } from '@/ai/analyses/runner';
+import type { AnalysisType } from '@/ai/analyses/types';
+
+export async function runAnalysisAction(
+  analysisType: AnalysisType,
+  accountId: string
+): Promise<{ success: true; analysisId: string } | { success: false; error: string }> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!user) return { success: false, error: 'unauthenticated' };
+
+  const { data: account } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('id', accountId)
+    .eq('user_id', user.id)
+    .single();
+  if (!account) return { success: false, error: 'account_not_found' };
 
   const result = await runAnalysis({
-    analysisType: params.analysisType,
-    accountId: params.accountId,
     userId: user.id,
-    range: { from: params.rangeFrom, to: params.rangeTo },
-    overrideTier: params.overrideTier,
-    supabase,
+    accountId,
+    analysisType,
+    triggerSource: 'manual',
   });
 
-  return { analysisId: result.analysisId };
+  if (result.status === 'failed') {
+    return { success: false, error: result.error ?? 'analysis_failed' };
+  }
+
+  revalidatePath('/dashboard/analyses');
+  revalidatePath('/dashboard');
+  return { success: true, analysisId: result.analysisId };
 }
