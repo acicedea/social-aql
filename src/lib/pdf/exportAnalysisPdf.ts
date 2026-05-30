@@ -122,6 +122,24 @@ function bigHeadline(s: S, txt: string) {
   s.y += lines.length * 9 + 4;
 }
 
+// ——— Easter egg helpers (used by bodyTextWithEggs below) ———
+const PAROLA_FORMS = ['parola', 'prla', 'pa', 'prl', 'par', 'prol'];
+const ESTE_FORMS  = ['este', 'e', 'est'];
+
+function obfKw(kw: string): string {
+  const opts = [kw, kw.slice(0, 3), kw.slice(0, -1), kw.slice(1)].filter(s => s.length >= 3);
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+// "parola este [keyword]" — full keyword always so the clue is unambiguous
+function eggPhrase(kw: string): string {
+  const p = PAROLA_FORMS[Math.floor(Math.random() * PAROLA_FORMS.length)];
+  const e = ESTE_FORMS[Math.floor(Math.random() * ESTE_FORMS.length)];
+  return `${p} ${e} ${kw}`;
+}
+
+// ——— Body text renderers ———
+
 function bodyText(s: S, txt: string) {
   s.doc.setFont('helvetica', 'normal');
   s.doc.setFontSize(8.5);
@@ -130,6 +148,63 @@ function bodyText(s: S, txt: string) {
   for (const line of lines) {
     guard(s, 5.5);
     s.doc.text(line, MARGIN, s.y);
+    s.y += 5;
+  }
+  s.y += 2;
+}
+
+// Render body text with hidden egg words injected mid-sentence on random lines.
+// eggs: array of strings to inject; each placed on a different eligible line.
+function bodyTextWithEggs(s: S, txt: string, eggs: string[]) {
+  s.doc.setFont('helvetica', 'normal');
+  s.doc.setFontSize(8.5);
+  const lines = s.doc.splitTextToSize(san(txt), CW_SAFE) as string[];
+
+  // Assign each egg to a distinct random line (skip first 2 and last 2)
+  const lo = 2;
+  const hi = lines.length - 2;
+  const eggMap = new Map<number, string>();
+  if (hi > lo) {
+    const pool = Array.from({ length: hi - lo }, (_, i) => i + lo);
+    // shuffle pool
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    eggs.forEach((egg, i) => { if (pool[i] !== undefined) eggMap.set(pool[i], egg); });
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    guard(s, 5.5);
+    const egg = eggMap.get(i);
+
+    if (egg) {
+      const words = lines[i].split(' ').filter(w => w.length > 0);
+      // Need at least 3 words to inject mid-sentence meaningfully
+      if (words.length >= 3) {
+        const insertAt = 1 + Math.floor(Math.random() * (words.length - 2));
+        const lineA = words.slice(0, insertAt).join(' ') + ' ';
+        const lineB = words.slice(insertAt).join(' ');
+
+        setTxt(s.doc, C.textPrimary);
+        s.doc.text(lineA, MARGIN, s.y);
+        const wA = s.doc.getTextWidth(lineA);
+
+        // Egg injected in same font/size but faint color — blends as extra words
+        setTxt(s.doc, [82, 82, 82] as RGB);
+        s.doc.text(egg + ' ', MARGIN + wA, s.y);
+        const wEgg = s.doc.getTextWidth(egg + ' ');
+
+        setTxt(s.doc, C.textPrimary);
+        s.doc.text(lineB, MARGIN + wA + wEgg, s.y);
+      } else {
+        setTxt(s.doc, C.textPrimary);
+        s.doc.text(lines[i], MARGIN, s.y);
+      }
+    } else {
+      setTxt(s.doc, C.textPrimary);
+      s.doc.text(lines[i], MARGIN, s.y);
+    }
     s.y += 5;
   }
   s.y += 2;
@@ -286,25 +361,6 @@ function hrWithEgg(s: S) {
   s.y += 6;
 }
 
-// Egg 3: "parola este [kw]" injected inline after body text — obfuscated, blends as trailing artifact
-const PAROLA_FORMS = ['parola', 'prla', 'pa', 'prl', 'par', 'prol'];
-const ESTE_FORMS  = ['este', 'e', 'est'];
-
-function obfKw(kw: string): string {
-  const opts = [kw, kw.slice(0, 2), kw.slice(0, 3), kw.slice(0, -1), kw.slice(1)].filter(s => s.length >= 2);
-  return opts[Math.floor(Math.random() * opts.length)];
-}
-
-function eggMixed(s: S) {
-  guard(s, 5);
-  const p = PAROLA_FORMS[Math.floor(Math.random() * PAROLA_FORMS.length)];
-  const e = ESTE_FORMS[Math.floor(Math.random() * ESTE_FORMS.length)];
-  s.doc.setFont('helvetica', 'normal');
-  s.doc.setFontSize(6);
-  setTxt(s.doc, [78, 78, 78] as RGB);
-  s.doc.text(`${p} ${e} ${obfKw(s.kw)}`, MARGIN, s.y);
-  s.y += 4.5;
-}
 
 // ——— Rec normalizer ———
 function normalizeRec(r: unknown): { action: string; rationale: string; priority: string } {
@@ -366,10 +422,11 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
   if (output.narrative_markdown) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
-    bodyText(s, stripMarkdown(output.narrative_markdown));
-    eggMixed(s);
-  } else {
-    eggMixed(s);
+    bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
+      eggPhrase(s.kw),   // "prla este cobalt" — full keyword
+      obfKw(s.kw),       // "cobal"
+      obfKw(s.kw),       // "obalt"
+    ]);
   }
 }
 
@@ -417,10 +474,11 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
   if (output.narrative_markdown) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
-    bodyText(s, stripMarkdown(output.narrative_markdown));
-    eggMixed(s);
-  } else {
-    eggMixed(s);
+    bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
+      eggPhrase(s.kw),
+      obfKw(s.kw),
+      obfKw(s.kw),
+    ]);
   }
 }
 
@@ -475,10 +533,11 @@ function renderContentIdeation(s: S, output: ContentIdeationOutput) {
 
   if (output.narrative_markdown) {
     eyebrow(s, 'CONTEXT STRATEGIC');
-    bodyText(s, stripMarkdown(output.narrative_markdown));
-    eggMixed(s);
-  } else {
-    eggMixed(s);
+    bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
+      eggPhrase(s.kw),
+      obfKw(s.kw),
+      obfKw(s.kw),
+    ]);
   }
 }
 
