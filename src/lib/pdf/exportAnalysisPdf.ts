@@ -23,8 +23,8 @@ const C = {
   border:        [38, 38, 38] as RGB,
   borderPos:     [58, 92, 15] as RGB,
   borderNeg:     [92, 31, 26] as RGB,
-  eggFainter:    [35, 35, 35] as RGB,  // eggs 1 & 2: nearly invisible on #000
-  eggFaint:      [60, 60, 60] as RGB,  // egg 3: faint but readable on careful inspection
+  eggFainter:    [35, 35, 35] as RGB,
+  eggFaint:      [60, 60, 60] as RGB,
 };
 
 const KEYWORDS = ['umbra', 'fulger', 'nimbus', 'axiom', 'ecou', 'cobalt', 'vertex'];
@@ -32,13 +32,34 @@ const KEYWORDS = ['umbra', 'fulger', 'nimbus', 'axiom', 'ecou', 'cobalt', 'verte
 const MARGIN = 20;
 const PW = 210;
 const PH = 297;
-const CW = PW - MARGIN * 2;
+const CW = PW - MARGIN * 2;       // 170mm full content width
+const CW_SAFE = CW - 5;           // 165mm — used for body text to avoid overflow
 
 const TYPE_LABELS: Record<AnalysisType, string> = {
-  weekly_summary:   'SUMAR SĂPTĂMÂNAL',
-  content_patterns: 'TIPARE CONȚINUT',
-  content_ideation: 'IDEI CONȚINUT',
+  weekly_summary:   'SUMAR SAPTAMANAL',
+  content_patterns: 'TIPARE CONTINUT',
+  content_ideation: 'IDEI CONTINUT',
 };
+
+// ——— Sanitize: strip Romanian diacritics + non-Latin1 chars for built-in PDF fonts ———
+function san(str: string | undefined | null): string {
+  if (!str) return '';
+  return str
+    // Romanian diacritics — Unicode variants
+    .replace(/[ăÃ]/g, 'a').replace(/Ă/g, 'A')
+    .replace(/â/g, 'a').replace(/Â/g, 'A')
+    .replace(/î/g, 'i').replace(/Î/g, 'I')
+    .replace(/[șş]/g, 's').replace(/[ȘŞ]/g, 'S')
+    .replace(/[țţ]/g, 't').replace(/[ȚŢ]/g, 'T')
+    // Common unicode symbols
+    .replace(/[→➜➡]/g, '->').replace(/←/g, '<-').replace(/↗/g, '/')
+    .replace(/↓/g, 'v').replace(/[↑]/g, '^')
+    .replace(/[""]/g, '"').replace(/['']/g, "'")
+    .replace(/„/g, '"').replace(/[—–]/g, '-')
+    .replace(/…/g, '...').replace(/×/g, 'x')
+    // Strip anything still outside Latin-1
+    .replace(/[^\x00-\xFF]/g, '');
+}
 
 // ——— Layout state ———
 interface S {
@@ -71,6 +92,13 @@ function setFill(doc: jsPDF, c: RGB) { doc.setFillColor(c[0], c[1], c[2]); }
 function setStroke(doc: jsPDF, c: RGB) { doc.setDrawColor(c[0], c[1], c[2]); }
 function setTxt(doc: jsPDF, c: RGB) { doc.setTextColor(c[0], c[1], c[2]); }
 
+// charSpace helper — always reset to 0 after use to prevent bleed
+function withTracking(doc: jsPDF, spacing: number, fn: () => void) {
+  doc.setCharSpace(spacing);
+  fn();
+  doc.setCharSpace(0);
+}
+
 // ——— Text renderers ———
 
 function eyebrow(s: S, label: string) {
@@ -78,7 +106,9 @@ function eyebrow(s: S, label: string) {
   s.doc.setFont('helvetica', 'bold');
   s.doc.setFontSize(6.5);
   setTxt(s.doc, C.textMuted);
-  s.doc.text(label.toUpperCase(), MARGIN, s.y, { charSpace: 1.2 });
+  withTracking(s.doc, 0.15, () => {
+    s.doc.text(san(label).toUpperCase(), MARGIN, s.y);
+  });
   s.y += 7;
 }
 
@@ -87,7 +117,7 @@ function bigHeadline(s: S, txt: string) {
   s.doc.setFont('helvetica', 'bold');
   s.doc.setFontSize(22);
   setTxt(s.doc, C.textPrimary);
-  const lines = s.doc.splitTextToSize(txt.toUpperCase(), CW) as string[];
+  const lines = s.doc.splitTextToSize(san(txt).toUpperCase(), CW_SAFE) as string[];
   s.doc.text(lines, MARGIN, s.y);
   s.y += lines.length * 9 + 4;
 }
@@ -96,7 +126,7 @@ function bodyText(s: S, txt: string) {
   s.doc.setFont('helvetica', 'normal');
   s.doc.setFontSize(8.5);
   setTxt(s.doc, C.textSecondary);
-  const lines = s.doc.splitTextToSize(txt, CW) as string[];
+  const lines = s.doc.splitTextToSize(san(txt), CW_SAFE) as string[];
   for (const line of lines) {
     guard(s, 5.5);
     s.doc.text(line, MARGIN, s.y);
@@ -110,7 +140,7 @@ function monoText(s: S, txt: string, color: RGB = C.textMuted, size = 8) {
   s.doc.setFont('courier', 'normal');
   s.doc.setFontSize(size);
   setTxt(s.doc, color);
-  s.doc.text(txt, MARGIN, s.y);
+  s.doc.text(san(txt), MARGIN, s.y);
   s.y += 5.5;
 }
 
@@ -133,18 +163,21 @@ function statRow(s: S, label: string, value: string, valColor: RGB = C.textPrima
   s.doc.setFont('helvetica', 'bold');
   s.doc.setFontSize(7);
   setTxt(s.doc, C.textMuted);
-  s.doc.text(label.toUpperCase(), MARGIN + 4, s.y + 7.5, { charSpace: 0.8 });
+  withTracking(s.doc, 0.15, () => {
+    s.doc.text(san(label).toUpperCase(), MARGIN + 4, s.y + 7.5);
+  });
 
   s.doc.setFont('courier', 'bold');
   s.doc.setFontSize(9);
   setTxt(s.doc, valColor);
-  s.doc.text(value, PW - MARGIN - 4, s.y + 7.5, { align: 'right' });
+  s.doc.text(san(value), PW - MARGIN - 4, s.y + 7.5, { align: 'right' });
 
   s.y += h + 3;
 }
 
 function findingCard(s: S, f: KeyFinding) {
-  const bodyLines = (f.detail ? s.doc.splitTextToSize(f.detail, CW - 8) : []) as string[];
+  const safeDetail = san(f.detail ?? '');
+  const bodyLines = (safeDetail ? s.doc.splitTextToSize(safeDetail, CW_SAFE - 8) : []) as string[];
   const h = 6 + 5 + (f.metric ? 5 : 0) + bodyLines.length * 5 + 6;
   guard(s, h + 3);
 
@@ -161,14 +194,14 @@ function findingCard(s: S, f: KeyFinding) {
   s.doc.setFont('helvetica', 'bold');
   s.doc.setFontSize(7.5);
   setTxt(s.doc, C.textPrimary);
-  s.doc.text(f.title.toUpperCase(), MARGIN + 4, inner);
+  s.doc.text(san(f.title).toUpperCase(), MARGIN + 4, inner);
 
   if (f.metric) {
     inner += 5;
     s.doc.setFont('courier', 'normal');
     s.doc.setFontSize(7);
     setTxt(s.doc, C.lime);
-    s.doc.text(f.metric, MARGIN + 4, inner);
+    s.doc.text(san(f.metric), MARGIN + 4, inner);
   }
 
   if (bodyLines.length > 0) {
@@ -183,8 +216,10 @@ function findingCard(s: S, f: KeyFinding) {
 }
 
 function recCard(s: S, action: string, rationale: string, priority: string, idx: number) {
-  const ratLines = s.doc.splitTextToSize(rationale, CW - 18) as string[];
-  const actionLines = s.doc.splitTextToSize(action.toUpperCase(), CW - 28) as string[];
+  const safeAction = san(action);
+  const safeRat = san(rationale);
+  const ratLines = s.doc.splitTextToSize(safeRat, CW_SAFE - 18) as string[];
+  const actionLines = s.doc.splitTextToSize(safeAction.toUpperCase(), CW_SAFE - 28) as string[];
   const h = 6 + actionLines.length * 5 + ratLines.length * 5 + 8;
   guard(s, h + 3);
 
@@ -220,7 +255,6 @@ function recCard(s: S, action: string, rationale: string, priority: string, idx:
 
 // ——— Easter egg injectors ———
 
-// Egg 1: sys:ref tag in header — nearly invisible, looks like debug noise
 function eggSysRef(s: S) {
   guard(s, 5);
   s.doc.setFont('courier', 'normal');
@@ -230,7 +264,6 @@ function eggSysRef(s: S) {
   s.y += 4.5;
 }
 
-// Egg 2: keyword centered on section divider line — almost invisible
 function hrWithEgg(s: S) {
   guard(s, 8);
   setStroke(s.doc, C.border);
@@ -242,17 +275,16 @@ function hrWithEgg(s: S) {
   s.y += 6;
 }
 
-// Egg 3: "parola este [keyword]" — faint centered italic after all content
 function eggParola(s: S) {
   guard(s, 10);
   s.doc.setFont('courier', 'italic');
   s.doc.setFontSize(6);
   setTxt(s.doc, C.eggFaint);
-  s.doc.text(`— parola este ${s.kw} —`, PW / 2, s.y, { align: 'center' });
+  s.doc.text(`- parola este ${s.kw} -`, PW / 2, s.y, { align: 'center' });
   s.y += 7;
 }
 
-// ——— Recommendation normalizer (mirrors AnalysisDetail.tsx) ———
+// ——— Rec normalizer ———
 function normalizeRec(r: unknown): { action: string; rationale: string; priority: string } {
   const o = r as Record<string, unknown>;
   return {
@@ -269,7 +301,7 @@ function stripMarkdown(md: string): string {
     .replace(/#{1,6}\s+/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
-    .replace(/^[-*]\s+/gm, '• ')
+    .replace(/^[-*]\s+/gm, '- ')
     .trim();
 }
 
@@ -278,7 +310,7 @@ function stripMarkdown(md: string): string {
 function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
   const pc = output.period_comparison;
 
-  eyebrow(s, 'COMPARAȚIE PERIOADĂ');
+  eyebrow(s, 'COMPARATIE PERIOADA');
 
   const erColor: RGB = pc.er_change?.startsWith('+') ? C.lime : pc.er_change?.startsWith('-') ? C.coral : C.textPrimary;
   const rcColor: RGB = pc.reach_change?.startsWith('+') ? C.lime : pc.reach_change?.startsWith('-') ? C.coral : C.textPrimary;
@@ -286,14 +318,14 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
 
   statRow(s, 'ENGAGEMENT RATE', pc.er_change ?? 'N/A', erColor);
   statRow(s, 'REACH', pc.reach_change ?? 'N/A', rcColor);
-  statRow(s, 'URMĂRITORI', pc.follower_change ?? 'N/A', fcColor);
+  statRow(s, 'URMARITORI', pc.follower_change ?? 'N/A', fcColor);
   if (pc.summary) bodyText(s, pc.summary);
   gap(s, 6);
 
-  hrWithEgg(s); // ← Egg 2
+  hrWithEgg(s);
 
   if (output.key_findings?.length > 0) {
-    eyebrow(s, 'OBSERVAȚII CHEIE');
+    eyebrow(s, 'OBSERVATII CHEIE');
     output.key_findings.forEach(f => findingCard(s, f));
     gap(s, 6);
   }
@@ -301,7 +333,7 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
   hr(s);
 
   if (output.recommendations?.length > 0) {
-    eyebrow(s, 'RECOMANDĂRI');
+    eyebrow(s, 'RECOMANDARI');
     output.recommendations.forEach((r, i) => {
       const rec = normalizeRec(r);
       recCard(s, rec.action, rec.rationale, rec.priority, i);
@@ -311,7 +343,7 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
 
   if (output.narrative_markdown) {
     hr(s);
-    eyebrow(s, 'ANALIZĂ DETALIATĂ');
+    eyebrow(s, 'ANALIZA DETALIATA');
     bodyText(s, stripMarkdown(output.narrative_markdown));
   }
 }
@@ -330,12 +362,12 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
     gap(s, 6);
   }
 
-  hrWithEgg(s); // ← Egg 2
+  hrWithEgg(s);
 
   if (output.theme_performance?.length > 0) {
-    eyebrow(s, 'PERFORMANȚĂ PE TEME');
+    eyebrow(s, 'PERFORMANTA PE TEME');
     output.theme_performance.forEach(t => {
-      statRow(s, t.theme, `ER ${t.avg_er} · SAVES ${t.avg_saves}`);
+      statRow(s, t.theme, `ER ${t.avg_er} - SAVES ${t.avg_saves}`);
     });
     gap(s, 6);
   }
@@ -349,7 +381,7 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
 
   if (output.recommendations?.length > 0) {
     hr(s);
-    eyebrow(s, 'RECOMANDĂRI');
+    eyebrow(s, 'RECOMANDARI');
     output.recommendations.forEach((r, i) => {
       const rec = normalizeRec(r);
       recCard(s, rec.action, rec.rationale, rec.priority, i);
@@ -359,7 +391,7 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
 
   if (output.narrative_markdown) {
     hr(s);
-    eyebrow(s, 'ANALIZĂ DETALIATĂ');
+    eyebrow(s, 'ANALIZA DETALIATA');
     bodyText(s, stripMarkdown(output.narrative_markdown));
   }
 }
@@ -371,14 +403,20 @@ function renderContentIdeation(s: S, output: ContentIdeationOutput) {
     s.doc.setFont('helvetica', 'bold');
     s.doc.setFontSize(11);
     setTxt(s.doc, C.textPrimary);
-    const titleLines = s.doc.splitTextToSize(`${i + 1}. ${idea.title.toUpperCase()}`, CW) as string[];
+    const titleLines = s.doc.splitTextToSize(
+      san(`${i + 1}. ${idea.title}`).toUpperCase(),
+      CW_SAFE,
+    ) as string[];
     s.doc.text(titleLines, MARGIN, s.y);
     s.y += titleLines.length * 6 + 2;
 
     s.doc.setFont('courier', 'normal');
     s.doc.setFontSize(7);
     setTxt(s.doc, C.lime);
-    s.doc.text(`[${(idea.format ?? '').toUpperCase()}]  [${(idea.theme ?? '').toUpperCase()}]`, MARGIN, s.y);
+    s.doc.text(
+      `[${san(idea.format ?? '').toUpperCase()}]  [${san(idea.theme ?? '').toUpperCase()}]`,
+      MARGIN, s.y,
+    );
     s.y += 6;
 
     eyebrow(s, 'HOOK');
@@ -386,21 +424,21 @@ function renderContentIdeation(s: S, output: ContentIdeationOutput) {
     s.doc.setFont('helvetica', 'bolditalic');
     s.doc.setFontSize(8.5);
     setTxt(s.doc, C.textPrimary);
-    const hookLines = s.doc.splitTextToSize(`"${idea.hook}"`, CW) as string[];
+    const hookLines = s.doc.splitTextToSize(`"${san(idea.hook)}"`, CW_SAFE) as string[];
     s.doc.text(hookLines, MARGIN, s.y);
     s.y += hookLines.length * 5 + 3;
 
-    eyebrow(s, 'STRUCTURĂ');
+    eyebrow(s, 'STRUCTURA');
     const structText = typeof idea.structure === 'string'
       ? idea.structure
       : Object.entries(idea.structure as Record<string, string>).map(([k, v]) => `${k}: ${v}`).join(' | ');
     monoText(s, structText, C.textSecondary, 7.5);
 
-    eyebrow(s, 'DE CE VA FUNCȚIONA');
+    eyebrow(s, 'DE CE VA FUNCTIONA');
     bodyText(s, idea.rationale);
 
     if (i === 1) {
-      hrWithEgg(s); // ← Egg 2 on the divider after the second idea
+      hrWithEgg(s);
     } else {
       hr(s);
     }
@@ -439,16 +477,18 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
   setTxt(doc, C.lime);
-  doc.text('AI LICHIDITATE', MARGIN, s.y, { charSpace: 1.5 });
+  withTracking(doc, 0.15, () => {
+    doc.text('AI LICHIDITATE', MARGIN, s.y);
+  });
   s.y += 6;
 
-  eyebrow(s, `${TYPE_LABELS[props.analysisType]} · ${props.model}`);
+  eyebrow(s, `${TYPE_LABELS[props.analysisType]} - ${san(props.model)}`);
 
   if (props.rangeFrom && props.rangeTo) {
-    monoText(s, `${props.rangeFrom} → ${props.rangeTo}`, C.textMuted);
+    monoText(s, `${props.rangeFrom} -> ${props.rangeTo}`, C.textMuted);
   }
 
-  eggSysRef(s); // ← Egg 1 (page 1, after metadata — nearly invisible)
+  eggSysRef(s);
 
   monoText(s, new Date(props.createdAt).toLocaleString('ro-RO'), C.textMuted);
   gap(s, 6);
@@ -467,7 +507,7 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
     renderContentIdeation(s, output as ContentIdeationOutput);
   }
 
-  // ——— Egg 3: "parola este" after all content ———
+  // ——— Egg 3: "parola este" ———
   gap(s, 8);
   eggParola(s);
 
@@ -477,7 +517,7 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
   doc.setFontSize(6.5);
   setTxt(doc, C.textMuted);
   doc.text(
-    `GENERAT DE SISTEM · ${new Date(props.createdAt).toISOString()} · ${props.durationMs ? `${(props.durationMs / 1000).toFixed(1)}s` : '—'}`,
+    `GENERAT DE SISTEM - ${new Date(props.createdAt).toISOString()} - ${props.durationMs ? `${(props.durationMs / 1000).toFixed(1)}s` : '-'}`,
     PW / 2,
     s.y,
     { align: 'center' },
