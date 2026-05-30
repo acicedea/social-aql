@@ -67,6 +67,7 @@ interface S {
   y: number;
   page: number;
   kw: string;
+  kwPlaced: number;  // standalone keyword occurrences placed so far
 }
 
 // ——— Low-level helpers ———
@@ -160,19 +161,14 @@ function bodyTextWithEggs(s: S, txt: string, eggs: string[]) {
   s.doc.setFontSize(8.5);
   const lines = s.doc.splitTextToSize(san(txt), CW_SAFE) as string[];
 
-  // Assign each egg to a distinct random line (skip first 2 and last 2)
-  const lo = 2;
-  const hi = lines.length - 2;
-  const eggMap = new Map<number, string>();
-  if (hi > lo) {
-    const pool = Array.from({ length: hi - lo }, (_, i) => i + lo);
-    // shuffle pool
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    eggs.forEach((egg, i) => { if (pool[i] !== undefined) eggMap.set(pool[i], egg); });
+  // Assign eggs to distinct random lines — widen window to skip only first/last line
+  const pool = Array.from({ length: Math.max(0, lines.length - 2) }, (_, i) => i + 1);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
   }
+  const eggMap = new Map<number, string>();
+  eggs.forEach((egg, i) => { if (pool[i] !== undefined) eggMap.set(pool[i], egg); });
 
   for (let i = 0; i < lines.length; i++) {
     guard(s, 5.5);
@@ -180,7 +176,6 @@ function bodyTextWithEggs(s: S, txt: string, eggs: string[]) {
 
     if (egg) {
       const words = lines[i].split(' ').filter(w => w.length > 0);
-      // Need at least 3 words to inject mid-sentence meaningfully
       if (words.length >= 3) {
         const insertAt = 1 + Math.floor(Math.random() * (words.length - 2));
         const lineA = words.slice(0, insertAt).join(' ') + ' ';
@@ -190,13 +185,14 @@ function bodyTextWithEggs(s: S, txt: string, eggs: string[]) {
         s.doc.text(lineA, MARGIN, s.y);
         const wA = s.doc.getTextWidth(lineA);
 
-        // Egg injected in same font/size/color — extra words blended into sentence
         setTxt(s.doc, C.textPrimary);
         s.doc.text(egg + ' ', MARGIN + wA, s.y);
         const wEgg = s.doc.getTextWidth(egg + ' ');
 
         setTxt(s.doc, C.textPrimary);
         s.doc.text(lineB, MARGIN + wA + wEgg, s.y);
+
+        if (egg === s.kw) s.kwPlaced++;
       } else {
         setTxt(s.doc, C.textPrimary);
         s.doc.text(lines[i], MARGIN, s.y);
@@ -475,9 +471,9 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
     bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
-      eggPhrase(s.kw),
-      obfKw(s.kw),
-      obfKw(s.kw),
+      eggPhrase(s.kw),  // "prla este cobalt"
+      s.kw,              // full keyword
+      s.kw,              // full keyword again
     ]);
   }
 }
@@ -534,9 +530,9 @@ function renderContentIdeation(s: S, output: ContentIdeationOutput) {
   if (output.narrative_markdown) {
     eyebrow(s, 'CONTEXT STRATEGIC');
     bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
-      eggPhrase(s.kw),
-      obfKw(s.kw),
-      obfKw(s.kw),
+      eggPhrase(s.kw),  // "prla este cobalt"
+      s.kw,              // full keyword
+      s.kw,              // full keyword again
     ]);
   }
 }
@@ -557,7 +553,7 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
   const kw = KEYWORDS[Math.floor(Math.random() * KEYWORDS.length)];
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const s: S = { doc, y: MARGIN, page: 1, kw };
+  const s: S = { doc, y: MARGIN, page: 1, kw, kwPlaced: 0 };
 
   fillBg(doc);
 
@@ -595,6 +591,20 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
     renderContentPatterns(s, output as ContentPatternsOutput);
   } else {
     renderContentIdeation(s, output as ContentIdeationOutput);
+  }
+
+  // ——— Guarantee at least 2 standalone keyword occurrences ———
+  // Fallback: if bodyTextWithEggs didn't place enough (short narrative), inject remainder
+  // mid-line in the footer timestamp so it blends as metadata
+  while (s.kwPlaced < 2) {
+    guard(s, 5);
+    s.doc.setFont('helvetica', 'normal');
+    s.doc.setFontSize(8.5);
+    setTxt(s.doc, C.textPrimary);
+    const padX = MARGIN + 10 + Math.floor(s.kwPlaced * 30 + Math.random() * 20);
+    s.doc.text(s.kw, padX, s.y);
+    s.y += 5;
+    s.kwPlaced++;
   }
 
   // ——— Footer ———
