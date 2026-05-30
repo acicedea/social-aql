@@ -179,9 +179,17 @@ function statRow(s: S, label: string, value: string, valColor: RGB = C.textPrima
 }
 
 function findingCard(s: S, f: KeyFinding) {
+  // Measure title and body BEFORE drawing card so height is accurate
+  s.doc.setFont('helvetica', 'bold');
+  s.doc.setFontSize(7.5);
+  const titleLines = s.doc.splitTextToSize(san(f.title).toUpperCase(), CW - 10) as string[];
+
+  s.doc.setFont('helvetica', 'normal');
+  s.doc.setFontSize(8);
   const safeDetail = san(f.detail ?? '');
-  const bodyLines = (safeDetail ? s.doc.splitTextToSize(safeDetail, CW_SAFE - 8) : []) as string[];
-  const h = 6 + 5 + (f.metric ? 5 : 0) + bodyLines.length * 5 + 6;
+  const bodyLines = (safeDetail ? s.doc.splitTextToSize(safeDetail, CW - 10) : []) as string[];
+
+  const h = 6 + titleLines.length * 5 + (f.metric ? 5 : 0) + bodyLines.length * 5 + 6;
   guard(s, h + 3);
 
   const borderColor: RGB = f.tone === 'positive' ? C.borderPos : f.tone === 'negative' ? C.borderNeg : C.border;
@@ -197,18 +205,18 @@ function findingCard(s: S, f: KeyFinding) {
   s.doc.setFont('helvetica', 'bold');
   s.doc.setFontSize(7.5);
   setTxt(s.doc, C.textPrimary);
-  s.doc.text(san(f.title).toUpperCase(), MARGIN + 4, inner);
+  s.doc.text(titleLines, MARGIN + 4, inner);
+  inner += titleLines.length * 5;
 
   if (f.metric) {
-    inner += 5;
     s.doc.setFont('courier', 'normal');
     s.doc.setFontSize(7);
     setTxt(s.doc, C.lime);
     s.doc.text(san(f.metric), MARGIN + 4, inner);
+    inner += 5;
   }
 
   if (bodyLines.length > 0) {
-    inner += 5;
     s.doc.setFont('helvetica', 'normal');
     s.doc.setFontSize(8);
     setTxt(s.doc, C.textSecondary);
@@ -278,13 +286,24 @@ function hrWithEgg(s: S) {
   s.y += 6;
 }
 
-function eggParola(s: S) {
-  guard(s, 10);
-  s.doc.setFont('courier', 'italic');
+// Egg 3: "parola este [kw]" injected inline after body text — obfuscated, blends as trailing artifact
+const PAROLA_FORMS = ['parola', 'prla', 'pa', 'prl', 'par', 'prol'];
+const ESTE_FORMS  = ['este', 'e', 'est'];
+
+function obfKw(kw: string): string {
+  const opts = [kw, kw.slice(0, 2), kw.slice(0, 3), kw.slice(0, -1), kw.slice(1)].filter(s => s.length >= 2);
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+function eggMixed(s: S) {
+  guard(s, 5);
+  const p = PAROLA_FORMS[Math.floor(Math.random() * PAROLA_FORMS.length)];
+  const e = ESTE_FORMS[Math.floor(Math.random() * ESTE_FORMS.length)];
+  s.doc.setFont('helvetica', 'normal');
   s.doc.setFontSize(6);
-  setTxt(s.doc, C.eggFaint);
-  s.doc.text(`- parola este ${s.kw} -`, PW / 2, s.y, { align: 'center' });
-  s.y += 7;
+  setTxt(s.doc, [78, 78, 78] as RGB);
+  s.doc.text(`${p} ${e} ${obfKw(s.kw)}`, MARGIN, s.y);
+  s.y += 4.5;
 }
 
 // ——— Rec normalizer ———
@@ -348,6 +367,9 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
     bodyText(s, stripMarkdown(output.narrative_markdown));
+    eggMixed(s);
+  } else {
+    eggMixed(s);
   }
 }
 
@@ -396,6 +418,9 @@ function renderContentPatterns(s: S, output: ContentPatternsOutput) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
     bodyText(s, stripMarkdown(output.narrative_markdown));
+    eggMixed(s);
+  } else {
+    eggMixed(s);
   }
 }
 
@@ -451,6 +476,9 @@ function renderContentIdeation(s: S, output: ContentIdeationOutput) {
   if (output.narrative_markdown) {
     eyebrow(s, 'CONTEXT STRATEGIC');
     bodyText(s, stripMarkdown(output.narrative_markdown));
+    eggMixed(s);
+  } else {
+    eggMixed(s);
   }
 }
 
@@ -509,10 +537,6 @@ export function exportAnalysisPdf(props: ExportAnalysisPdfProps): void {
   } else {
     renderContentIdeation(s, output as ContentIdeationOutput);
   }
-
-  // ——— Egg 3: "parola este" ———
-  gap(s, 8);
-  eggParola(s);
 
   // ——— Footer ———
   hr(s);
