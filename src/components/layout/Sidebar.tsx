@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/accounts', label: 'Conturi' },
   { href: '/dashboard/posts', label: 'Postări' },
   { href: '/dashboard/analyses', label: 'Analize' },
+  { href: '/dashboard/chat', label: 'Chat' },
   { href: '/dashboard/settings', label: 'Setări' },
 ];
 

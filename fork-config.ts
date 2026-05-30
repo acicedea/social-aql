@@ -91,6 +91,7 @@ const config: ForkConfig = {
   ai: {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
+    chatModel: 'gemini-2.5-flash',
     analysisLocale: 'ro',
   },
 

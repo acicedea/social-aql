@@ -44,6 +44,7 @@ export interface ForkConfig {
   ai: {
     provider: 'gemini' | 'claude';
     model: string;
+    chatModel: string;
     analysisLocale: 'ro' | 'en';
   };
   contentNiche: {
