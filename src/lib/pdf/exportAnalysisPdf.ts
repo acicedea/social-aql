@@ -190,8 +190,8 @@ function bodyTextWithEggs(s: S, txt: string, eggs: string[]) {
         s.doc.text(lineA, MARGIN, s.y);
         const wA = s.doc.getTextWidth(lineA);
 
-        // Egg injected in same font/size but faint color — blends as extra words
-        setTxt(s.doc, [82, 82, 82] as RGB);
+        // Egg injected in same font/size/color — extra words blended into sentence
+        setTxt(s.doc, C.textPrimary);
         s.doc.text(egg + ' ', MARGIN + wA, s.y);
         const wEgg = s.doc.getTextWidth(egg + ' ');
 
@@ -423,9 +423,9 @@ function renderWeeklySummary(s: S, output: WeeklySummaryOutput) {
     hr(s);
     eyebrow(s, 'ANALIZA DETALIATA');
     bodyTextWithEggs(s, stripMarkdown(output.narrative_markdown), [
-      eggPhrase(s.kw),   // "prla este cobalt" — full keyword
-      obfKw(s.kw),       // "cobal"
-      obfKw(s.kw),       // "obalt"
+      eggPhrase(s.kw),  // "prla este cobalt"
+      s.kw,              // full keyword
+      s.kw,              // full keyword again
     ]);
   }
 }
