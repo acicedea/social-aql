@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { colors } from '@/themes/platform/tokens';
 import { Eyebrow, H2, H3, Body, Mono } from '@/components/design-system/Typography';
 import { Card } from '@/components/design-system/Card';
+import { exportAnalysisPdf } from '@/lib/pdf/exportAnalysisPdf';
 import type {
   AnalysisType,
   WeeklySummaryOutput,
@@ -508,6 +509,16 @@ interface Props {
 export function AnalysisDetail({ analysisType, structuredOutput, createdAt, rangeFrom, rangeTo, model, durationMs }: Props) {
   const output = structuredOutput as WeeklySummaryOutput & ContentPatternsOutput & ContentIdeationOutput;
 
+  const [exporting, setExporting] = useState(false);
+
+  function handleExport() {
+    setExporting(true);
+    setTimeout(() => {
+      exportAnalysisPdf({ analysisType, structuredOutput, createdAt, rangeFrom, rangeTo, model, durationMs });
+      setExporting(false);
+    }, 0);
+  }
+
   const relTime = (() => {
     const diff = Date.now() - new Date(createdAt).getTime();
     const mins = Math.floor(diff / 60_000);
@@ -522,10 +533,34 @@ export function AnalysisDetail({ analysisType, structuredOutput, createdAt, rang
     <div style={{ display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 860 }}>
       {/* Header */}
       <div>
-        <Eyebrow>
-          {TYPE_LABELS[analysisType] ?? analysisType} · {model} · {relTime}
-          {durationMs && ` · ${(durationMs / 1000).toFixed(1)}s`}
-        </Eyebrow>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Eyebrow>
+            {TYPE_LABELS[analysisType] ?? analysisType} · {model} · {relTime}
+            {durationMs && ` · ${(durationMs / 1000).toFixed(1)}s`}
+          </Eyebrow>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: exporting ? colors.textMuted : colors.accentLime,
+              background: 'transparent',
+              border: `1px solid ${exporting ? colors.borderDefault : colors.borderPositive}`,
+              borderRadius: 4,
+              padding: '4px 10px',
+              cursor: exporting ? 'default' : 'pointer',
+              transition: 'color 0.15s, border-color 0.15s',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {exporting ? 'EXPORT...' : '↓ PDF'}
+          </button>
+        </div>
         {rangeFrom && rangeTo && (
           <div style={{ marginTop: 4 }}>
             <Mono tone="muted">{rangeFrom} → {rangeTo}</Mono>
