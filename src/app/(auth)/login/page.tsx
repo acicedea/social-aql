@@ -116,7 +116,7 @@ export default function LoginPage() {
           <>
             {/* Mode tabs */}
             <div style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${colors.borderDefault}`, paddingBottom: 0 }}>
-              {(['signin', 'signup', 'magic'] as Mode[]).map((m) => (
+              {(['signin'] as Mode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => { setMode(m); setError(null); }}
