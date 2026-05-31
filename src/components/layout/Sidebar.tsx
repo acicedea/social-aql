@@ -18,9 +18,10 @@ const NAV_ITEMS = [
 
 interface SidebarProps {
   userEmail: string;
+  userRole?: 'admin' | 'viewer';
 }
 
-export function Sidebar({ userEmail }: SidebarProps) {
+export function Sidebar({ userEmail, userRole }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -102,18 +103,34 @@ export function Sidebar({ userEmail }: SidebarProps) {
           gap: 12,
         }}
       >
-        <span
-          style={{
-            fontFamily: 'var(--font-jetbrains-mono), monospace',
-            fontSize: 11,
-            color: colors.textMuted,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {userEmail}
-        </span>
+        <div style={{ overflow: 'hidden' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 11,
+              color: colors.textMuted,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              display: 'block',
+            }}
+          >
+            {userEmail}
+          </span>
+          {userRole && (
+            <span
+              style={{
+                fontFamily: 'var(--font-jetbrains-mono), monospace',
+                fontSize: 10,
+                color: userRole === 'admin' ? colors.accentLime : colors.textMuted,
+                display: 'block',
+                marginTop: 2,
+              }}
+            >
+              {userRole === 'admin' ? '● ADMIN' : '○ VIEWER'}
+            </span>
+          )}
+        </div>
         <form action={signOut}>
           <button
             type="submit"

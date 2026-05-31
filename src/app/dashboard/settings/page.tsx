@@ -6,6 +6,9 @@ import { colors } from '@/themes/platform/tokens';
 import { aiProviders } from '@/ai/registry';
 import { aiConfig } from '@/config/ai.config';
 import { BackfillThemesSection } from '@/components/dashboard/BackfillThemesSection';
+import { UserManagementSection } from '@/components/dashboard/UserManagementSection';
+import { getCurrentUserRole } from '@/lib/roles';
+import { fetchViewersAction, fetchPendingInvitesAction } from './actions';
 import forkConfig from '../../../../fork-config';
 import { appConfig } from '@/config/app.config';
 
@@ -13,9 +16,19 @@ export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [{ count: totalPosts }, { count: classifiedPosts }] = await Promise.all([
+  const userProfile = await getCurrentUserRole();
+  const adminUser = userProfile?.role === 'admin';
+
+  const [
+    { count: totalPosts },
+    { count: classifiedPosts },
+    viewers,
+    pendingInvites,
+  ] = await Promise.all([
     supabase.from('posts').select('*', { count: 'exact', head: true }),
     supabase.from('posts').select('*', { count: 'exact', head: true }).not('theme', 'is', null),
+    adminUser ? fetchViewersAction() : Promise.resolve([]),
+    adminUser ? fetchPendingInvitesAction() : Promise.resolve([]),
   ]);
 
   return (
@@ -132,6 +145,18 @@ export default async function SettingsPage() {
           classifiedPosts={classifiedPosts ?? 0}
         />
       </div>
+
+      {adminUser && (
+        <div>
+          <div style={{ marginTop: 32, marginBottom: 16 }}>
+            <H2>UTILIZATORI · MANAGEMENT</H2>
+          </div>
+          <UserManagementSection
+            viewers={viewers}
+            pendingInvites={pendingInvites}
+          />
+        </div>
+      )}
 
       <div>
         <div style={{ marginTop: 32, marginBottom: 16 }}>

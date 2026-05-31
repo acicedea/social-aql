@@ -18,9 +18,10 @@ interface Account {
 
 interface Props {
   accounts: Account[];
+  isAdmin: boolean;
 }
 
-export function ConnectedAccountsList({ accounts }: Props) {
+export function ConnectedAccountsList({ accounts, isAdmin }: Props) {
   const [disconnectingAccount, setDisconnectingAccount] = useState<Account | null>(null);
 
   if (accounts.length === 0) {
@@ -50,28 +51,40 @@ export function ConnectedAccountsList({ accounts }: Props) {
             status={account.status.toUpperCase()}
             tone={account.status === 'active' ? 'positive' : 'negative'}
             action={
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <SyncAccountButton accountId={account.id} />
-                <button
-                  onClick={() => setDisconnectingAccount(account)}
+              isAdmin ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <SyncAccountButton accountId={account.id} />
+                  <button
+                    onClick={() => setDisconnectingAccount(account)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-jetbrains-mono), monospace',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: colors.accentCoral,
+                      padding: '0 4px',
+                      marginLeft: 16,
+                      flexShrink: 0,
+                    }}
+                  >
+                    DEZCONECTEAZĂ
+                  </button>
+                </span>
+              ) : (
+                <span
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
                     fontFamily: 'var(--font-jetbrains-mono), monospace',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: colors.accentCoral,
-                    padding: '0 4px',
-                    marginLeft: 16,
-                    flexShrink: 0,
+                    fontSize: 10,
+                    color: colors.textMuted,
                   }}
                 >
-                  DEZCONECTEAZĂ
-                </button>
-              </span>
+                  VIZUALIZARE
+                </span>
+              )
             }
           />
         ))}

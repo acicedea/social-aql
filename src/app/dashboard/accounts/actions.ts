@@ -7,9 +7,19 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getProviderClient } from '@/config/providers.config';
 import { syncAccount } from '@/lib/sync/sync-account';
 import { env } from '@/lib/env';
+import { checkAdmin } from '@/lib/roles';
 import crypto from 'crypto';
 
 export async function connectProviderAction(providerId: string): Promise<void> {
+  const roleCheck = await checkAdmin();
+  if (!roleCheck.ok) {
+    throw new Error(
+      roleCheck.error === 'forbidden'
+        ? 'Doar adminul poate conecta conturi.'
+        : 'Autentificare necesară.'
+    );
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -37,6 +47,11 @@ export async function disconnectAccountAction(
   accountId: string,
   confirmationHandle: string
 ): Promise<{ success: true } | { success: false; error: string }> {
+  const roleCheck = await checkAdmin();
+  if (!roleCheck.ok) {
+    return { success: false, error: roleCheck.error };
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -82,6 +97,11 @@ export async function disconnectAccountAction(
 export async function syncAccountAction(
   accountId: string
 ): Promise<{ success: true; postsCount: number } | { success: false; error: string }> {
+  const roleCheck = await checkAdmin();
+  if (!roleCheck.ok) {
+    return { success: false, error: roleCheck.error };
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

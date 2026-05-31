@@ -1,5 +1,6 @@
 import React from 'react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCurrentUserRole } from '@/lib/roles';
 import { Eyebrow, H1, Body, Mono } from '@/components/design-system/Typography';
 import { RunAnalysisButton } from '@/components/analyses/RunAnalysisButton';
 import { AnalysisCard } from '@/components/analyses/AnalysisCard';
@@ -41,7 +42,8 @@ export default async function AnalysesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: accounts }, { data: analyses }] = await Promise.all([
+  const [userProfile, { data: accounts }, { data: analyses }] = await Promise.all([
+    getCurrentUserRole(),
     supabase
       .from('accounts')
       .select('id, display_name, handle')
@@ -57,6 +59,7 @@ export default async function AnalysesPage() {
       .limit(50),
   ]);
 
+  const adminUser = userProfile?.role === 'admin';
   const defaultAccount = accounts?.[0];
   const hasAccounts = (accounts?.length ?? 0) > 0;
 
@@ -69,8 +72,8 @@ export default async function AnalysesPage() {
         </div>
       </div>
 
-      {/* Generate section */}
-      <div>
+      {/* Generate section — admin only */}
+      {adminUser && <div>
         <Eyebrow tone="muted">GENEREAZĂ ANALIZĂ NOUĂ</Eyebrow>
         {!hasAccounts ? (
           <div style={{ marginTop: 12 }}>
@@ -123,7 +126,7 @@ export default async function AnalysesPage() {
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       {/* History */}
       <div>
