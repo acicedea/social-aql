@@ -15,8 +15,6 @@ export async function runAgent(
   const startTime = Date.now();
   const supabase = createSupabaseServiceClient();
 
-  console.log(`[agent] starting ${runType} run for user ${userId}`);
-
   const { data: accounts } = await supabase
     .from('accounts')
     .select('id, display_name, handle')
@@ -32,8 +30,7 @@ export async function runAgent(
   const sinceHours = runType === 'monday' ? 72 : 48;
 
   console.log('[agent] building account pulse...');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pulse = await buildAccountPulse(userId, account.id, sinceHours, supabase as any);
+  const pulse = await buildAccountPulse(userId, account.id, sinceHours, supabase);
 
   console.log('[agent] running industry scout...');
   const { news, upcomingEvents } = await runIndustryScout(runType);
@@ -45,8 +42,7 @@ export async function runAgent(
     pulse,
     news,
     events: upcomingEvents,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    supabaseClient: supabase as any,
+    supabaseClient: supabase,
   });
 
   const { data: insight } = await supabase
