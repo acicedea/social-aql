@@ -17,7 +17,16 @@ export async function GET(request: NextRequest) {
     const result = await runTranscriptionWorker();
     const duration = Date.now() - startTime;
     console.log(`[cron/transcribe] done in ${duration}ms:`, result);
-    return NextResponse.json({ success: true, result, durationMs: duration });
+    return NextResponse.json({
+      success: true,
+      result,
+      budget: {
+        used: result.budgetUsed,
+        remaining: result.budgetRemaining,
+        daily: 20,
+      },
+      durationMs: duration,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[cron/transcribe] worker error:', message);
