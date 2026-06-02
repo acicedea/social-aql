@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { colors } from '@/themes/platform/tokens';
 import { Eyebrow, H2, Mono } from '@/components/design-system/Typography';
 import { Tag } from '@/components/design-system/Tag';
+import { PostCaptionLink } from '@/components/dashboard/PostCaptionLink';
 import { formatKpiPercent, formatLargeNumber } from '@/lib/kpis/formatters';
 
 const THEME_LABELS: Record<string, string> = {
@@ -99,6 +100,19 @@ export default async function PostsPage({
   query = query.order(col, { ascending: sortAsc, nullsFirst: false });
 
   const { data: posts } = await query;
+
+  // Fetch transcription status for posts
+  const postIds = (posts ?? []).map(p => p.id);
+  const { data: transcriptionJobs } = postIds.length > 0
+    ? await supabase
+        .from('transcription_jobs')
+        .select('post_id, status')
+        .in('post_id', postIds)
+    : { data: [] };
+
+  const transcriptionStatusMap = new Map(
+    (transcriptionJobs ?? []).map(job => [job.post_id, job.status])
+  );
 
   const hasActiveFilters = !!(params.theme || params.type || (params.days && params.days !== '30') || params.ids);
   const hasFilteredPosts = (posts?.length ?? 0) > 0;
@@ -241,6 +255,7 @@ export default async function PostsPage({
                 <th style={thStyle}>TIP</th>
                 <th style={{ ...thStyle, width: '30%' }}>CAPTION</th>
                 <th style={thStyle}>TEMĂ</th>
+                <th style={thStyle}>TRANSCRIPT</th>
                 <th style={thStyle}>{sortLink('published_at', 'PUBLICAT')}</th>
                 <th style={thStyle}>{sortLink('reach', 'REACH')}</th>
                 <th style={thStyle}>{sortLink('er_by_reach', 'ER%')}</th>
@@ -280,11 +295,12 @@ export default async function PostsPage({
                         {post.media_type}
                       </span>
                     </td>
-                    <td style={{ ...tdStyle, color: colors.textPrimary, fontFamily: 'var(--font-inter), sans-serif', fontSize: 13 }}>
-                      {post.caption
-                        ? post.caption.slice(0, 80) + (post.caption.length > 80 ? '…' : '')
-                        : <span style={{ color: colors.textMuted }}>—</span>
-                      }
+                    <td style={{ ...tdStyle, fontFamily: 'var(--font-inter), sans-serif', fontSize: 13, padding: 0 }}>
+                      {post.caption ? (
+                        <PostCaptionLink postId={post.id} caption={post.caption} />
+                      ) : (
+                        <span style={{ color: colors.textMuted, display: 'block', padding: '10px 12px' }}>—</span>
+                      )}
                     </td>
                     <td style={tdStyle}>
                       {themeTag ? (
@@ -292,6 +308,23 @@ export default async function PostsPage({
                       ) : (
                         <span style={{ color: colors.textMuted }}>—</span>
                       )}
+                    </td>
+                    <td style={tdStyle}>
+                      {(() => {
+                        const transcriptStatus = transcriptionStatusMap.get(post.id);
+                        if (!transcriptStatus) return <span style={{ color: colors.textMuted }}>—</span>;
+
+                        const tagMap: Record<string, { label: string; variant: 'lime' | 'coral' | 'muted' }> = {
+                          completed: { label: '✓ DONE', variant: 'lime' },
+                          pending: { label: '⏳ PENDING', variant: 'muted' },
+                          processing: { label: '◔ PROCESSING', variant: 'muted' },
+                          failed: { label: '✗ FAILED', variant: 'coral' },
+                          skipped: { label: '⊘ SKIPPED', variant: 'muted' },
+                        };
+
+                        const config = tagMap[transcriptStatus] ?? { label: transcriptStatus.toUpperCase(), variant: 'muted' };
+                        return <Tag variant={config.variant}>{config.label}</Tag>;
+                      })()}
                     </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{date}</td>
                     <td style={tdStyle}>{formatLargeNumber(post.reach)}</td>

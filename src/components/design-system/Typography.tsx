@@ -148,6 +148,7 @@ export function H3({ children }: H3Props) {
 interface BodyProps {
   children: React.ReactNode;
   tone?: 'primary' | 'secondary' | 'muted';
+  style?: React.CSSProperties;
 }
 
 const bodyToneColor = {
@@ -156,7 +157,7 @@ const bodyToneColor = {
   muted: colors.textMuted,
 };
 
-export function Body({ children, tone = 'primary' }: BodyProps) {
+export function Body({ children, tone = 'primary', style }: BodyProps) {
   return (
     <p
       style={{
@@ -166,6 +167,7 @@ export function Body({ children, tone = 'primary' }: BodyProps) {
         lineHeight: 1.5,
         color: bodyToneColor[tone],
         margin: 0,
+        ...style,
       }}
     >
       {children}
@@ -176,6 +178,7 @@ export function Body({ children, tone = 'primary' }: BodyProps) {
 interface MonoProps {
   children: React.ReactNode;
   tone?: 'lime' | 'coral' | 'muted' | 'primary';
+  style?: React.CSSProperties;
 }
 
 const monoToneColor = {
@@ -185,7 +188,7 @@ const monoToneColor = {
   primary: colors.textPrimary,
 };
 
-export function Mono({ children, tone = 'primary' }: MonoProps) {
+export function Mono({ children, tone = 'primary', style }: MonoProps) {
   return (
     <span
       style={{
@@ -193,6 +196,7 @@ export function Mono({ children, tone = 'primary' }: MonoProps) {
         fontSize: 13,
         fontWeight: 400,
         color: monoToneColor[tone],
+        ...style,
       }}
     >
       {children}

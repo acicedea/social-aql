@@ -138,11 +138,17 @@ export default async function DashboardPage({ searchParams }: Props) {
   const activeAccountId = params.account ?? accounts[0].id;
   const activeAccount = accounts.find(a => a.id === activeAccountId) ?? accounts[0];
 
+  const isAllTime = params.range === 'all';
   let rangeDays = parseInt(params.range ?? '30', 10);
   if (isNaN(rangeDays) || rangeDays <= 0) rangeDays = 30;
 
   let dashParams = buildDashboardParams(user.id, activeAccount.id, rangeDays);
-  if (params.from && params.to) {
+
+  if (isAllTime) {
+    const from = '2010-01-01';
+    const to = new Date().toISOString().slice(0, 10);
+    dashParams = { userId: user.id, accountId: activeAccount.id, from, to, prevFrom: from, prevTo: from };
+  } else if (params.from && params.to) {
     const rangeMs = new Date(params.to).getTime() - new Date(params.from).getTime();
     const prevTo = new Date(new Date(params.from).getTime() - 1);
     const prevFrom = new Date(prevTo.getTime() - rangeMs);
@@ -181,9 +187,11 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const latestInsight = agentResult.data;
 
-  const dateLabel = params.from && params.to
-    ? `${params.from} → ${params.to}`
-    : `Ultimele ${rangeDays} zile`;
+  const dateLabel = isAllTime
+    ? 'Toate'
+    : params.from && params.to
+      ? `${params.from} → ${params.to}`
+      : `Ultimele ${rangeDays} zile`;
 
   return (
     <>

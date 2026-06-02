@@ -299,7 +299,62 @@ export function OverviewTab({ data, dateLabel }: OverviewTabProps) {
         </div>
       </div>
 
-      {/* ── Section 4: Theme Performance ─────────────────────────────── */}
+      {/* ── Section 4: Video Retention Summary ───────────────────────── */}
+      {data.videoRetentionSummary && (
+        <div
+          style={{
+            background: colors.bgCard,
+            border: `1px solid ${colors.borderDefault}`,
+            borderRadius: 6,
+            padding: 16,
+          }}
+        >
+          <div style={{ marginBottom: 12 }}><Eyebrow tone="muted">VIDEO RETENȚIE · MEDIE PERIOADĂ</Eyebrow></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>AVG COMPLETION</div>
+              <div style={{
+                fontFamily: 'var(--font-jetbrains-mono)',
+                fontSize: 24,
+                fontWeight: 700,
+                color: (data.videoRetentionSummary.avgCompletionRate ?? 0) > 40 ? colors.accentLime : colors.accentCoral,
+              }}>
+                {data.videoRetentionSummary.avgCompletionRate}%
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>HOOK SLAB</div>
+              <div style={{
+                fontFamily: 'var(--font-jetbrains-mono)',
+                fontSize: 24,
+                fontWeight: 700,
+                color: data.videoRetentionSummary.reelsWithWeakHook > 0 ? colors.accentCoral : colors.accentLime,
+              }}>
+                {data.videoRetentionSummary.reelsWithWeakHook}
+              </div>
+              <div style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 9, color: colors.textMuted }}>
+                din {data.videoRetentionSummary.reelsWithData} Reels
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>RETENȚIE CRITICĂ</div>
+              <div style={{
+                fontFamily: 'var(--font-jetbrains-mono)',
+                fontSize: 24,
+                fontWeight: 700,
+                color: data.videoRetentionSummary.reelsWithCriticalDrop > 0 ? colors.accentCoral : colors.accentLime,
+              }}>
+                {data.videoRetentionSummary.reelsWithCriticalDrop}
+              </div>
+              <div style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 9, color: colors.textMuted }}>
+                necesită atenție
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 5: Theme Performance ─────────────────────────────── */}
       <div
         style={{
           background: colors.bgCard,

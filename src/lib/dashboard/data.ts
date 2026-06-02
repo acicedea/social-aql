@@ -1,5 +1,7 @@
 import 'server-only';
 import { classifyHookType, classifyCaptionLength, detectSaveCta } from '@/lib/content-analysis/caption-utils';
+import { analyzeRetention } from '@/lib/retention/retention-analyzer';
+import type { TranscriptionSegment } from '@/lib/transcription/types';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { THEMES } from '@/lib/themes/theme-keywords';
 
@@ -82,6 +84,12 @@ export interface OverviewData {
   topPostsBySendRate: PostSummary[];
   themeBreakdown: ThemeStats[];
   diagnostics: DiagnosticFlag[];
+  videoRetentionSummary: {
+    reelsWithData: number;
+    avgCompletionRate: number | null;
+    reelsWithWeakHook: number;
+    reelsWithCriticalDrop: number;
+  } | null;
 }
 
 export interface PerformanceData {
@@ -493,7 +501,30 @@ export async function fetchOverviewData(params: DashboardParams): Promise<Overvi
     .gte('published_at', params.from)
     .lte('published_at', params.to + 'T23:59:59')
     .order('published_at', { ascending: false })
+    .limit(500);
+
+  // 2b. reel/video retention data
+  const { data: retentionRaw } = await supabase
+    .from('posts_with_latest_metrics')
+    .select('id, media_type, avg_watch_time_seconds, watch_time_seconds, video_views, reach, transcript, transcript_segments')
+    .eq('account_id', params.accountId)
+    .gte('published_at', params.from)
+    .lte('published_at', params.to + 'T23:59:59')
+    .in('media_type', ['reel', 'video'])
     .limit(200);
+
+  // 2c. fetch durations from transcription_jobs for reels
+  const postIds = (retentionRaw ?? []).map(p => (p as Record<string, unknown>).id as string);
+  const { data: jobsData } = postIds.length > 0 ? await supabase
+    .from('transcription_jobs')
+    .select('post_id, duration_seconds')
+    .in('post_id', postIds)
+    : { data: [] };
+
+  const durationMap = new Map((jobsData ?? []).map((j: Record<string, unknown>) => [
+    j.post_id as string,
+    j.duration_seconds as number | null,
+  ]));
 
   // 3. previous period posts (only KPI columns needed)
   const { data: prevRaw } = await supabase
@@ -502,7 +533,7 @@ export async function fetchOverviewData(params: DashboardParams): Promise<Overvi
     .eq('account_id', params.accountId)
     .gte('published_at', params.prevFrom)
     .lte('published_at', params.prevTo + 'T23:59:59')
-    .limit(200);
+    .limit(500);
 
   // 4. follower history for the period
   const { data: followerHistoryRaw } = await supabase
@@ -594,6 +625,34 @@ export async function fetchOverviewData(params: DashboardParams): Promise<Overvi
       avgSends: safeAvg(data.sends),
     }));
 
+  // Video retention summary
+  const retentionAnalyses = (retentionRaw ?? [])
+    .map(p => {
+      const pRec = p as Record<string, unknown>;
+      const postId = pRec.id as string;
+      const duration = durationMap.get(postId);
+      return analyzeRetention({
+        avgWatchTimeMs: pRec.avg_watch_time_seconds != null ? (pRec.avg_watch_time_seconds as number) * 1000 : null,
+        totalWatchTimeMs: pRec.watch_time_seconds != null ? (pRec.watch_time_seconds as number) * 1000 : null,
+        plays: (pRec.video_views as number | null) ?? (pRec.reach as number | null) ?? null,
+        segments: (pRec.transcript_segments as TranscriptionSegment[] | null) ?? null,
+        transcript: (pRec.transcript as string | null) ?? null,
+        estimatedDurationSeconds: duration ?? null,
+      });
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  const videoRetentionSummary = retentionAnalyses.length > 0 ? {
+    reelsWithData: retentionAnalyses.length,
+    avgCompletionRate: Math.round(
+      retentionAnalyses.reduce((s, r) => s + r.completionRate, 0) / retentionAnalyses.length
+    ),
+    reelsWithWeakHook: retentionAnalyses.filter(r => r.hookStrength === 'weak').length,
+    reelsWithCriticalDrop: retentionAnalyses.filter(r =>
+      r.retentionHealth === 'critical' || r.retentionHealth === 'poor'
+    ).length,
+  } : null;
+
   return {
     account: {
       id: accountRow?.id ?? params.accountId,
@@ -613,6 +672,7 @@ export async function fetchOverviewData(params: DashboardParams): Promise<Overvi
     topPostsBySendRate,
     themeBreakdown,
     diagnostics: computeDiagnosticFlags(posts, current),
+    videoRetentionSummary,
   };
 }
 
@@ -742,7 +802,7 @@ export async function fetchContentData(params: DashboardParams): Promise<Content
     .gte('published_at', params.from)
     .lte('published_at', params.to + 'T23:59:59')
     .order('er_by_reach', { ascending: false, nullsFirst: false })
-    .limit(200);
+    .limit(500);
 
   const posts = (raw ?? []).map(toPostWithMetrics);
 

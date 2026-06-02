@@ -21,6 +21,8 @@ import type { PostDiagnosticInput } from '@/lib/diagnostics/post-diagnostics';
 import type { TranscriptionSegment } from '@/lib/transcription/types';
 import type { TranscriptMetrics } from '@/lib/transcription/transcript-metrics-types';
 import type { PostCritique } from '@/lib/transcription/post-critique';
+import { analyzeRetention } from '@/lib/retention/retention-analyzer';
+import { RetentionDiagnosticCard } from '@/components/posts/RetentionDiagnosticCard';
 
 const THEME_LABELS: Record<string, string> = {
   fed: 'FED · Politică Monetară',
@@ -154,6 +156,19 @@ export default async function PostDetailPage({
     );
   }
 
+  // Retention analysis (Reels/Video only)
+  const isVideo = post.media_type === 'reel' || post.media_type === 'video';
+  const avgWatchTimeSec = (p.avg_watch_time_seconds as number | null) ?? null;
+  const watchTimeSec = (p.watch_time_seconds as number | null) ?? null;
+  const retentionAnalysis = isVideo ? analyzeRetention({
+    avgWatchTimeMs: avgWatchTimeSec != null ? avgWatchTimeSec * 1000 : null,
+    totalWatchTimeMs: watchTimeSec != null ? watchTimeSec * 1000 : null,
+    plays: (p.video_views as number | null) ?? (p.reach as number | null) ?? null,
+    segments: post.transcript_segments as TranscriptionSegment[] ?? null,
+    transcript: post.transcript ?? null,
+    estimatedDurationSeconds: null,
+  }) : null;
+
   // Fetch existing AI critique
   const { data: existingCritiqueRow } = await supabase
     .from('ai_analyses')
@@ -275,7 +290,12 @@ export default async function PostDetailPage({
       {/* Section 4: Diagnostic Checklist */}
       {isEnabled('postDiagnosticChecklist') && <PostDiagnosticChecklist result={diagnosticResult} />}
 
-      {/* Section 5: Transcript */}
+      {/* Section 5: Retention diagnostic */}
+      {retentionAnalysis && (
+        <RetentionDiagnosticCard analysis={retentionAnalysis} />
+      )}
+
+      {/* Section 7: Transcript */}
       <TranscriptSection
         transcript={(p.transcript as string | null) ?? null}
         segments={(p.transcript_segments as TranscriptionSegment[]) ?? null}
@@ -285,7 +305,7 @@ export default async function PostDetailPage({
         jobStatus={transcriptionJob?.status ?? null}
       />
 
-      {/* Section 6: AI Critique */}
+      {/* Section 8: AI Critique */}
       {(post.transcript || transcriptMetrics) && (
         <PostCritiqueSection
           postId={post.id}

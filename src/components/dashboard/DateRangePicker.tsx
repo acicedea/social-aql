@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { colors } from '@/themes/platform/tokens';
 
 const RANGES = [7, 14, 30, 90] as const;
+const ALL_RANGE = 'all';
 
 export function DateRangePicker() {
   const router = useRouter();
@@ -17,12 +18,13 @@ export function DateRangePicker() {
 
   const activeRange = searchParams.get('range') ?? '30';
   const hasCustom = searchParams.has('from') && searchParams.has('to');
+  const isAll = activeRange === ALL_RANGE && !hasCustom;
 
   function navigate(params: URLSearchParams) {
     router.push(`/dashboard?${params.toString()}`);
   }
 
-  function handleQuickRange(days: number) {
+  function handleQuickRange(days: number | typeof ALL_RANGE) {
     const params = new URLSearchParams(searchParams.toString());
     params.set('range', String(days));
     params.delete('from');
@@ -77,6 +79,24 @@ export function DateRangePicker() {
           </button>
         );
       })}
+      <button
+        onClick={() => handleQuickRange(ALL_RANGE)}
+        style={{
+          fontFamily: 'var(--font-jetbrains-mono)',
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          padding: '4px 10px',
+          borderRadius: 4,
+          cursor: 'pointer',
+          border: `1px solid ${isAll ? colors.accentLime : colors.borderDefault}`,
+          background: 'transparent',
+          color: isAll ? colors.accentLime : colors.textMuted,
+        }}
+      >
+        ALL
+      </button>
       <button
         onClick={() => setShowCustom(v => !v)}
         style={{
