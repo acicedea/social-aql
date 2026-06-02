@@ -95,7 +95,8 @@ export async function disconnectAccountAction(
 }
 
 export async function syncAccountAction(
-  accountId: string
+  accountId: string,
+  days: number | 'all' = 'all'
 ): Promise<{ success: true; postsCount: number } | { success: false; error: string }> {
   const roleCheck = await checkAdmin();
   if (!roleCheck.ok) {
@@ -117,7 +118,7 @@ export async function syncAccountAction(
   if (!account) return { success: false, error: 'not_found' };
 
   try {
-    const result = await syncAccount(accountId, user.id);
+    const result = await syncAccount(accountId, user.id, days);
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/accounts');
     revalidatePath('/dashboard/posts');

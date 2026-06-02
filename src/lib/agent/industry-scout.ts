@@ -3,139 +3,166 @@ import { env } from '@/lib/env';
 import type { IndustryNewsItem, UpcomingEvent } from './types';
 import forkConfig from '../../../fork-config';
 
-const SCOUT_SYSTEM_PROMPT = `Ești un analist de piețe financiare care monitorizează știrile relevante pentru un creator de conținut financiar român.
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
-Returnezi STRICT JSON cu două secțiuni:
-1. "news": array de știri relevante din ultimele 48 ore
-2. "upcoming_events": array de evenimente financiare programate în următoarele 72 ore
+// ── STEP 1: Fetch real news via grounding ─────────────────────────────
 
-Pentru fiecare știre:
-- Evaluează relevanța pentru creatorii de conținut financiar din România
-- Identifică tema principală (fed, crypto, stocks_us, gold, forex, real_estate, economy_eu, macro, education)
-- Prioritizează știrile cu impact emoțional/acțional pentru audiența retail
-
-Pentru upcoming events:
-- Include: ședințe FED/BCE, earnings majore (NVDA, AAPL, TSLA etc.), date macro (CPI, NFP, PIB)
-- Urgency: "urgent" = în <24h, "planned" = 24-72h, "watch" = >72h dar important
-
-Returnează DOAR JSON valid în formatul cerut. Bazează-te pe rezultatele căutărilor web.`;
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-
-export async function runIndustryScout(runType: 'monday' | 'wednesday' | 'friday'): Promise<{
-  news: IndustryNewsItem[];
-  upcomingEvents: UpcomingEvent[];
-}> {
-  const apiKey = env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) {
-    console.warn('[industry-scout] GOOGLE_GENERATIVE_AI_API_KEY not set, returning empty');
-    return { news: [], upcomingEvents: [] };
-  }
-
+async function fetchRealNewsText(runType: string): Promise<string> {
   const today = new Date().toLocaleDateString('ro-RO', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
   const themes = forkConfig.contentNiche.themes.join(', ');
 
+  const prompt = `Astăzi este ${today}.
+
+Caută pe web și găsește:
+1. Cele mai importante știri financiare din ultimele 48 de ore relevante pentru un creator de conținut financiar român
+2. Evenimente financiare programate în următoarele 72 de ore (ședințe FED/BCE, earnings majore, date macro CPI/NFP/PIB)
+
+Teme relevante: ${themes}
+
+Pentru fiecare știre: titlu exact, sursă, rezumat 1-2 propoziții, relevanță (high/medium)
+Pentru fiecare event: ce event, când exact, de ce contează pentru investitori români
+
+Fii specific și bazează-te STRICT pe ce găsești în search. Nu inventa.`;
+
   void runType;
 
-  const userPrompt = `Astăzi este ${today}.
-
-Caută pe web știrile financiare relevante din ultimele 48 de ore și evenimentele programate în următoarele 72 de ore.
-
-Focus pe teme relevante pentru un creator financiar român: ${themes}
-
-Returnează știrile cu relevanță HIGH și MEDIUM pentru audiența de retail investors din România.
-Maxim 6 știri + maxim 4 upcoming events.
-
-Returnează STRICT în format JSON (fără markdown, fără \`\`\`):
-{
-  "news": [{"title": "...", "summary": "...", "source": "...", "url": "...", "relevance": "high|medium|low", "theme": "...", "published_at": "..."}],
-  "upcoming_events": [{"event": "...", "date_description": "...", "theme": "...", "urgency": "urgent|planned|watch", "description": "..."}]
-}`;
-
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${env.GOOGLE_GENERATIVE_AI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: SCOUT_SYSTEM_PROMPT }] },
+        contents: [{ parts: [{ text: prompt }] }],
         tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 3000 },
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 3000,
+        },
       }),
     }
   );
 
   if (!response.ok) {
-    console.error('[industry-scout] Gemini REST error:', await response.text());
-    return { news: [], upcomingEvents: [] };
+    const err = await response.text();
+    throw new Error(`Scout grounding call failed: ${response.status} — ${err.slice(0, 200)}`);
   }
 
-  const json = await response.json() as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-    }>;
-  };
+  const json = await response.json() as any;
+  const text = json.candidates?.[0]?.content?.parts
+    ?.filter((p: any) => p.text)
+    ?.map((p: any) => p.text)
+    ?.join('') ?? '';
 
-  const textParts = json.candidates?.[0]?.content?.parts?.filter(p => p.text) ?? [];
-  const rawText = textParts.map(p => p.text ?? '').join('');
+  if (!text) throw new Error('Scout grounding returned empty response');
 
-  if (!rawText) {
-    console.warn('[industry-scout] empty response from Gemini');
-    return { news: [], upcomingEvents: [] };
+  console.log(`[scout] grounding call returned ${text.length} chars`);
+  return text;
+}
+
+// ── STEP 2: Structure the raw news text into JSON ─────────────────────
+
+const STRUCTURE_SCHEMA = {
+  type: 'object',
+  properties: {
+    news: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          summary: { type: 'string' },
+          source: { type: 'string' },
+          url: { type: 'string' },
+          relevance: { type: 'string', enum: ['high', 'medium', 'low'] },
+          theme: {
+            type: 'string',
+            enum: [
+              'fed', 'crypto', 'stocks_us', 'gold', 'forex',
+              'real_estate', 'economy_eu', 'macro',
+              'education', 'investing_principles', 'trading_strategy',
+              'emerging_markets', 'other',
+            ],
+          },
+        },
+        required: ['title', 'summary', 'source', 'relevance'],
+      },
+    },
+    upcoming_events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          event: { type: 'string' },
+          date_description: { type: 'string' },
+          theme: { type: 'string' },
+          urgency: { type: 'string', enum: ['urgent', 'planned', 'watch'] },
+          description: { type: 'string' },
+        },
+        required: ['event', 'date_description', 'theme', 'urgency', 'description'],
+      },
+    },
+  },
+  required: ['news', 'upcoming_events'],
+};
+
+async function structureNewsJson(rawText: string): Promise<{
+  news: IndustryNewsItem[];
+  upcomingEvents: UpcomingEvent[];
+}> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${env.GOOGLE_GENERATIVE_AI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Structurează textul de mai jos în JSON conform schemei.
+Păstrează titlurile și sursele EXACTE din text. Nu adăuga informații care nu sunt în text.
+Maxim 5 știri (cele mai relevante) + maxim 4 events.
+
+TEXT DE STRUCTURAT:
+${rawText}`,
+          }],
+        }],
+        generationConfig: {
+          temperature: 0.0,
+          maxOutputTokens: 2000,
+          responseMimeType: 'application/json',
+          responseSchema: STRUCTURE_SCHEMA,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Scout structure call failed: ${response.status}`);
   }
 
-  // Extract JSON from response (may be wrapped in markdown code blocks)
-  const jsonMatch = rawText.match(/```json\n?([\s\S]*?)\n?```/) ??
-    rawText.match(/```\n?([\s\S]*?)\n?```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : rawText;
+  const json = await response.json() as any;
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
 
-  let parsed: {
-    news?: Array<{
-      title: string;
-      summary: string;
-      source: string;
-      url?: string;
-      relevance: string;
-      theme?: string;
-      published_at?: string;
-    }>;
-    upcoming_events?: Array<{
-      event: string;
-      date_description: string;
-      theme: string;
-      urgency: string;
-      description: string;
-    }>;
-  } = {};
-
+  let parsed: any;
   try {
-    parsed = JSON.parse(jsonText.trim());
+    parsed = JSON.parse(text.replace(/```json\n?|```\n?/g, '').trim());
   } catch {
-    // Try to find JSON object in the text
-    const objMatch = rawText.match(/\{[\s\S]*\}/);
-    if (objMatch) {
-      try { parsed = JSON.parse(objMatch[0]); } catch { /* ignore */ }
-    }
-    if (!parsed.news) {
-      console.warn('[industry-scout] could not parse JSON, raw:', rawText.slice(0, 300));
-    }
+    throw new Error(`Scout failed to parse JSON: ${text.slice(0, 200)}`);
   }
 
   return {
-    news: (parsed.news ?? []).map(n => ({
+    news: (parsed.news ?? []).map((n: any) => ({
       title: n.title,
       summary: n.summary,
       source: n.source,
       url: n.url ?? null,
       relevance: n.relevance as IndustryNewsItem['relevance'],
       theme: n.theme ?? null,
-      publishedAt: n.published_at ?? null,
+      publishedAt: null,
     })),
-    upcomingEvents: (parsed.upcoming_events ?? []).map(e => ({
+    upcomingEvents: (parsed.upcoming_events ?? []).map((e: any) => ({
       event: e.event,
       dateDescription: e.date_description,
       theme: e.theme,
@@ -143,4 +170,19 @@ Returnează STRICT în format JSON (fără markdown, fără \`\`\`):
       description: e.description,
     })),
   };
+}
+
+// ── Main export ───────────────────────────────────────────────────────
+
+export async function runIndustryScout(runType: 'monday' | 'wednesday' | 'friday'): Promise<{
+  news: IndustryNewsItem[];
+  upcomingEvents: UpcomingEvent[];
+}> {
+  console.log(`[scout] starting industry scout for ${runType}`);
+
+  const rawText = await fetchRealNewsText(runType);
+  const result = await structureNewsJson(rawText);
+
+  console.log(`[scout] found ${result.news.length} news items, ${result.upcomingEvents.length} events`);
+  return result;
 }

@@ -7,7 +7,8 @@ import { detectTheme } from '@/lib/themes/detect-theme';
 
 export async function syncAccount(
   accountId: string,
-  userId: string
+  userId: string,
+  days: number | 'all' = 'all'
 ): Promise<{ postsInserted: number; snapshotsInserted: number }> {
   const supabase = await createSupabaseServerClient();
 
@@ -51,7 +52,9 @@ export async function syncAccount(
     .single();
 
   const now = new Date().toISOString();
-  const rangeFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const rangeFrom = days === 'all'
+    ? new Date('2010-01-01').toISOString()
+    : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const range = { from: rangeFrom, to: now };
 
   const transcriptionJobsToQueue: Array<{

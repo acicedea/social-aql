@@ -1,12 +1,6 @@
 import 'server-only';
 import type { AccountPulse, IndustryNewsItem, UpcomingEvent, ContentOpportunity, RunType } from './types';
 
-const runTypeLabels: Record<RunType, string> = {
-  monday: 'BRIEFING SĂPTĂMÂNAL · LUNI',
-  wednesday: 'PULS MID-WEEK · MIERCURI',
-  friday: 'PREP WEEKEND · VINERI',
-};
-
 export function buildAgentEmailHtml(params: {
   runType: RunType;
   pulse: AccountPulse;
@@ -17,206 +11,322 @@ export function buildAgentEmailHtml(params: {
 }): { subject: string; html: string; text: string } {
   const { runType, pulse, news, events, opportunities } = params;
 
+  // ── Subject line ────────────────────────────────────────────────────
   const urgentEvent = events.find(e => e.urgency === 'urgent');
   const topOpportunity = opportunities.find(o => o.priority === 1);
   const hasAlerts = pulse.alertPosts.length > 0 || pulse.reachTrend === 'down';
 
-  let subject = `📊 ${runTypeLabels[runType]}`;
+  const runLabels: Record<RunType, string> = {
+    monday: 'BRIEFING LUNI',
+    wednesday: 'PULS MIERCURI',
+    friday: 'PREP VINERI',
+  };
+
+  let subject = `📊 AI LICHIDITATE · ${runLabels[runType]}`;
   if (urgentEvent) subject += ` · ${urgentEvent.event}`;
   else if (topOpportunity) subject += ` · ${topOpportunity.title}`;
-  if (hasAlerts) subject += ` ⚠️`;
+  if (hasAlerts) subject += ' ⚠️';
 
-  const highNews = news.filter(n => n.relevance === 'high').slice(0, 3);
-  const mediumNews = news.filter(n => n.relevance === 'medium').slice(0, 2);
-  const urgentEvents = events.filter(e => e.urgency === 'urgent');
-  const plannedEvents = events.filter(e => e.urgency === 'planned');
+  // ── Colors ──────────────────────────────────────────────────────────
+  const C = {
+    bg: '#000000',
+    bgCard: '#111111',
+    bgPositive: '#0A1A04',
+    bgNegative: '#1A0806',
+    textPrimary: '#F2EFE4',
+    textSecondary: '#8A8A8A',
+    textMuted: '#5A5A5A',
+    lime: '#C7F84C',
+    limeDim: '#7A9A2E',
+    coral: '#FF5A4E',
+    border: '#222222',
+    borderPositive: '#2A4A10',
+  };
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #0A0A0A; color: #F2EFE4; line-height: 1.5; }
-    .container { max-width: 640px; margin: 0 auto; padding: 32px 24px; }
-    .header { border-bottom: 1px solid #262626; padding-bottom: 20px; margin-bottom: 24px; }
-    .logo { font-size: 13px; letter-spacing: 0.1em; color: #C7F84C; font-weight: 700; }
-    .runtype { font-size: 11px; color: #8A8A8A; margin-top: 4px; letter-spacing: 0.08em; }
-    .section { margin-bottom: 28px; }
-    .section-title { font-size: 10px; letter-spacing: 0.12em; color: #5A5A5A; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #1A1A1A; }
-    .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #141414; border-radius: 4px; margin-bottom: 6px; }
-    .metric-label { font-size: 12px; color: #8A8A8A; }
-    .metric-value { font-size: 13px; font-weight: 600; font-family: 'Courier New', monospace; }
-    .lime { color: #C7F84C; }
-    .coral { color: #FF5A4E; }
-    .news-item { padding: 10px 12px; background: #141414; border-left: 3px solid #262626; border-radius: 0 4px 4px 0; margin-bottom: 8px; }
-    .news-item.high { border-left-color: #C7F84C; }
-    .news-item.medium { border-left-color: #7A9A2E; }
-    .news-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-    .news-summary { font-size: 12px; color: #8A8A8A; }
-    .event-item { padding: 8px 12px; border-radius: 4px; margin-bottom: 6px; }
-    .event-urgent { background: #1A0908; border-left: 3px solid #FF5A4E; }
-    .event-planned { background: #141414; border-left: 3px solid #C7F84C; }
-    .event-label { font-size: 10px; letter-spacing: 0.08em; margin-bottom: 3px; }
-    .event-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-    .event-desc { font-size: 12px; color: #8A8A8A; }
-    .opportunity { background: #0E1A06; border: 1px solid #3A5C0F; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
-    .opp-priority { font-size: 10px; letter-spacing: 0.1em; color: #C7F84C; margin-bottom: 8px; }
-    .opp-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
-    .opp-hook { font-size: 13px; font-style: italic; color: #F2EFE4; background: #141414; padding: 10px 12px; border-radius: 4px; border-left: 2px solid #C7F84C; margin-bottom: 10px; }
-    .opp-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
-    .opp-badge { font-size: 10px; padding: 2px 8px; background: #141414; border: 1px solid #262626; border-radius: 3px; color: #8A8A8A; font-family: 'Courier New', monospace; }
-    .opp-rationale { font-size: 12px; color: #8A8A8A; }
-    .alert-box { padding: 12px 16px; background: #1A0908; border-left: 3px solid #FF5A4E; border-radius: 0 4px 4px 0; margin-bottom: 8px; }
-    .cta-button { display: inline-block; padding: 12px 24px; background: #C7F84C; color: #000; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 24px; }
-    .footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid #1A1A1A; font-size: 11px; color: #5A5A5A; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">AI LICHIDITATE</div>
-      <div class="runtype">${runTypeLabels[runType]} · ${new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-    </div>
+  // ── Helpers ─────────────────────────────────────────────────────────
+  const mono = (text: string, size = 13, color = C.textPrimary, weight = 400) =>
+    `<span style="font-family:'Courier New',Courier,monospace;font-size:${size}px;color:${color};font-weight:${weight};">${text}</span>`;
 
-    <div class="section">
-      <div class="section-title">CONT · ULTIMELE 48H</div>
-      ${pulse.reachTrend === 'down' && Math.abs(pulse.reachDelta) > 15 ? `
-        <div class="alert-box">⚠️ Reach în scădere: ${pulse.reachDelta}% față de perioada precedentă</div>
-      ` : ''}
-      ${pulse.daysSinceLastPost >= 3 ? `
-        <div class="alert-box">⚠️ ${pulse.daysSinceLastPost} zile fără postare — consistența e cheie</div>
-      ` : ''}
-      <div class="metric-row">
-        <span class="metric-label">Postări publicate</span>
-        <span class="metric-value">${pulse.postsPublished}</span>
-      </div>
-      <div class="metric-row">
-        <span class="metric-label">Trend reach</span>
-        <span class="metric-value ${pulse.reachTrend === 'up' ? 'lime' : pulse.reachTrend === 'down' ? 'coral' : ''}">
-          ${pulse.reachTrend === 'up' ? '↑' : pulse.reachTrend === 'down' ? '↓' : '→'}
-          ${pulse.reachDelta > 0 ? '+' : ''}${pulse.reachDelta}%
-        </span>
-      </div>
-      ${pulse.topPost ? `
-        <div class="metric-row">
-          <span class="metric-label">Top post: "${(pulse.topPost.caption ?? '').slice(0, 40)}..."</span>
-          <span class="metric-value lime">ER ${pulse.topPost.erByReach?.toFixed(2)}%</span>
-        </div>
-      ` : ''}
-      ${pulse.alertPosts.map(p => `
-        <div class="metric-row">
-          <span class="metric-label">⚠️ "${(p.caption ?? '').slice(0, 40)}..."</span>
-          <span class="metric-value coral">${p.issue}</span>
-        </div>
-      `).join('')}
-    </div>
+  const body = (text: string, size = 13, color = C.textPrimary) =>
+    `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:${size}px;color:${color};line-height:1.6;">${text}</p>`;
 
-    ${highNews.length > 0 || mediumNews.length > 0 ? `
-      <div class="section">
-        <div class="section-title">PIEȚE · ȘTIRI RELEVANTE</div>
-        ${highNews.map(n => `
-          <div class="news-item high">
-            <div class="news-title">🔴 ${n.title}</div>
-            <div class="news-summary">${n.summary}</div>
-            <div class="news-summary" style="margin-top: 4px; color: #5A5A5A;">
-              ${n.source}${n.url ? ` · <a href="${n.url}" style="color: #7A9A2E;">citește</a>` : ''}
-            </div>
-          </div>
-        `).join('')}
-        ${mediumNews.map(n => `
-          <div class="news-item medium">
-            <div class="news-title">🟡 ${n.title}</div>
-            <div class="news-summary">${n.summary}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+  const metricPill = (label: string, value: string, valueColor = C.textPrimary) =>
+    `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:6px;">
+      <tr>
+        <td style="background-color:${C.bgCard};border:1px solid ${C.border};border-radius:4px;padding:10px 14px;">
+          <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+            <tr>
+              <td>${mono(label, 11, C.textSecondary)}</td>
+              <td align="right">${mono(value, 13, valueColor, 600)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>`;
 
-    ${urgentEvents.length > 0 || plannedEvents.length > 0 ? `
-      <div class="section">
-        <div class="section-title">CALENDAR · EVENIMENTE</div>
-        ${urgentEvents.map(e => `
-          <div class="event-item event-urgent">
-            <div class="event-label coral">⚡ URGENT · ${e.dateDescription.toUpperCase()}</div>
-            <div class="event-name">${e.event}</div>
-            <div class="event-desc">${e.description}</div>
-          </div>
-        `).join('')}
-        ${plannedEvents.map(e => `
-          <div class="event-item event-planned">
-            <div class="event-label" style="color: #7A9A2E;">📅 ${e.dateDescription.toUpperCase()}</div>
-            <div class="event-name">${e.event}</div>
-            <div class="event-desc">${e.description}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+  const alertBox = (text: string) =>
+    `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:8px;">
+      <tr>
+        <td style="background-color:${C.bgNegative};border-left:3px solid ${C.coral};border-radius:0 4px 4px 0;padding:10px 14px;">
+          ${body(`⚠️ ${text}`, 12, C.coral)}
+        </td>
+      </tr>
+    </table>`;
 
-    <div class="section">
-      <div class="section-title">OPORTUNITĂȚI CONȚINUT · ${opportunities.length} IDEI</div>
-      ${opportunities.sort((a, b) => a.priority - b.priority).map(o => `
-        <div class="opportunity">
-          <div class="opp-priority">
-            ${'⭐'.repeat(4 - o.priority)} PRIORITATE ${o.priority}
-            ${o.urgency === 'now' ? ' · POSTEAZĂ ACUM' : o.urgency === 'tomorrow' ? ' · MÂINE' : ' · ACEASTĂ SĂPTĂMÂNĂ'}
-          </div>
-          <div class="opp-title">${o.title}</div>
-          <div class="opp-hook">"${o.hook}"</div>
-          <div class="opp-meta">
-            <span class="opp-badge">${o.format}</span>
-            <span class="opp-badge">${o.theme.toUpperCase()}</span>
-            <span class="opp-badge">⏰ ${o.bestTimeToPost}</span>
-            <span class="opp-badge">ER est. ${o.estimatedEr}</span>
-          </div>
-          <div class="opp-rationale">${o.rationale}</div>
-        </div>
-      `).join('')}
-    </div>
+  const newsCard = (item: IndustryNewsItem) => {
+    const borderColor = item.relevance === 'high' ? C.lime : C.limeDim;
+    const dot = item.relevance === 'high' ? '🔴' : '🟡';
+    return `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:8px;">
+      <tr>
+        <td style="background-color:${C.bgCard};border-left:3px solid ${borderColor};border-radius:0 4px 4px 0;padding:10px 14px;">
+          ${body(`${dot} <strong>${item.title}</strong>`, 13, C.textPrimary)}
+          <div style="height:4px;"></div>
+          ${body(item.summary, 12, C.textSecondary)}
+          ${item.source ? `<div style="height:4px;"></div>${mono(item.source + (item.url ? ` · <a href="${item.url}" style="color:${C.limeDim};text-decoration:none;">citește →</a>` : ''), 10, C.textMuted)}` : ''}
+        </td>
+      </tr>
+    </table>`;
+  };
 
-    <a href="${params.appUrl}/dashboard/agent" class="cta-button">→ DESCHIDE DASHBOARD COMPLET</a>
+  const eventCard = (event: UpcomingEvent) => {
+    const isUrgent = event.urgency === 'urgent';
+    const bg = isUrgent ? C.bgNegative : C.bgCard;
+    const border = isUrgent ? C.coral : C.limeDim;
+    const urgencyLabel = isUrgent ? '⚡ URGENT' : '📅 PROGRAMAT';
+    const urgencyColor = isUrgent ? C.coral : C.limeDim;
+    return `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:6px;">
+      <tr>
+        <td style="background-color:${bg};border-left:3px solid ${border};border-radius:0 4px 4px 0;padding:10px 14px;">
+          ${mono(`${urgencyLabel} · ${event.dateDescription.toUpperCase()}`, 10, urgencyColor)}
+          <div style="height:4px;"></div>
+          ${body(`<strong>${event.event}</strong>`, 13, C.textPrimary)}
+          <div style="height:4px;"></div>
+          ${body(event.description, 12, C.textSecondary)}
+        </td>
+      </tr>
+    </table>`;
+  };
 
-    <div class="footer">
-      <p>AI LICHIDITATE · Agent Proactiv · ${runTypeLabels[runType]}</p>
-      <p style="margin-top: 4px;">Următorul briefing: ${getNextRunLabel(runType)}</p>
-    </div>
-  </div>
-</body>
-</html>`;
+  const opportunityCard = (opp: ContentOpportunity) => {
+    const stars = '⭐'.repeat(4 - opp.priority);
+    const urgencyLabel = opp.urgency === 'now' ? 'POSTEAZĂ ACUM'
+      : opp.urgency === 'tomorrow' ? 'MÂINE'
+      : 'ACEASTĂ SĂPTĂMÂNĂ';
 
-  const text = [
-    `AI LICHIDITATE · ${runTypeLabels[runType]}`,
-    '='.repeat(50),
-    '',
-    'CONT · ULTIMELE 48H',
-    `Postări: ${pulse.postsPublished} | Trend reach: ${pulse.reachTrend} (${pulse.reachDelta > 0 ? '+' : ''}${pulse.reachDelta}%)`,
-    pulse.alertPosts.map(p => `⚠️ ${p.issue}`).join('\n'),
-    '',
-    'ȘTIRI RELEVANTE',
-    highNews.map(n => `🔴 ${n.title}\n   ${n.summary}`).join('\n'),
-    '',
-    'OPORTUNITĂȚI',
-    opportunities.map((o, i) => [
-      `${i + 1}. ${o.title}`,
-      `   Hook: "${o.hook}"`,
-      `   Format: ${o.format} | Postează: ${o.bestTimeToPost}`,
-      `   ${o.rationale}`,
-    ].join('\n')).join('\n\n'),
-    '',
-    `Dashboard: ${params.appUrl}/dashboard/agent`,
-  ].filter(Boolean).join('\n');
+    return `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:12px;">
+      <tr>
+        <td style="background-color:${C.bgPositive};border:1px solid ${C.borderPositive};border-radius:6px;padding:16px;">
+          ${mono(`${stars} PRIORITATE ${opp.priority} · ${urgencyLabel}`, 10, C.lime)}
+          <div style="height:8px;"></div>
+          ${body(`<strong style="font-size:15px;">${opp.title}</strong>`, 15, C.textPrimary)}
+          <div style="height:10px;"></div>
+          <table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+            <tr>
+              <td style="background-color:${C.bgCard};border-left:3px solid ${C.lime};border-radius:0 4px 4px 0;padding:10px 14px;">
+                ${body(`<em>"${opp.hook}"</em>`, 13, C.textPrimary)}
+              </td>
+            </tr>
+          </table>
+          <div style="height:10px;"></div>
+          <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-right:6px;"><span style="display:inline-block;background-color:${C.bgCard};border:1px solid ${C.border};border-radius:3px;padding:3px 8px;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.textMuted};">${opp.format}</span></td>
+              <td style="padding-right:6px;"><span style="display:inline-block;background-color:${C.bgCard};border:1px solid ${C.border};border-radius:3px;padding:3px 8px;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.textMuted};">${opp.theme.toUpperCase()}</span></td>
+              <td style="padding-right:6px;"><span style="display:inline-block;background-color:${C.bgCard};border:1px solid ${C.border};border-radius:3px;padding:3px 8px;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.textMuted};">⏰ ${opp.bestTimeToPost}</span></td>
+              <td><span style="display:inline-block;background-color:${C.bgCard};border:1px solid ${C.borderPositive};border-radius:3px;padding:3px 8px;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.limeDim};">ER est. ${opp.estimatedEr}</span></td>
+            </tr>
+          </table>
+          <div style="height:10px;"></div>
+          ${body(opp.rationale, 12, C.textSecondary)}
+        </td>
+      </tr>
+    </table>`;
+  };
 
-  return { subject, html, text };
-}
+  // ── Build content ────────────────────────────────────────────────────
+  const dateStr = new Date().toLocaleDateString('ro-RO', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
 
-function getNextRunLabel(current: RunType): string {
-  const next: Record<RunType, string> = {
+  const runLabelsFull: Record<RunType, string> = {
+    monday: 'BRIEFING SĂPTĂMÂNAL · LUNI',
+    wednesday: 'PULS MID-WEEK · MIERCURI',
+    friday: 'PREP WEEKEND · VINERI',
+  };
+
+  const nextRunLabels: Record<RunType, string> = {
     monday: 'Miercuri dimineață',
     wednesday: 'Vineri dimineață',
     friday: 'Luni dimineața viitoare',
   };
-  return next[current];
+
+  const reachColor = pulse.reachTrend === 'up' ? C.lime
+    : pulse.reachTrend === 'down' ? C.coral : C.textPrimary;
+  const reachArrow = pulse.reachTrend === 'up' ? '↑' : pulse.reachTrend === 'down' ? '↓' : '→';
+  const reachDeltaStr = `${pulse.reachDelta > 0 ? '+' : ''}${pulse.reachDelta}%`;
+
+  let pulseContent = '';
+  if (pulse.reachTrend === 'down' && Math.abs(pulse.reachDelta) > 15) {
+    pulseContent += alertBox(`Reach în scădere ${reachDeltaStr} față de perioada precedentă`);
+  }
+  if (pulse.daysSinceLastPost >= 3) {
+    pulseContent += alertBox(`${pulse.daysSinceLastPost} zile fără postare — consistența e cheie`);
+  }
+  pulseContent += metricPill('POSTĂRI PUBLICATE', `${pulse.postsPublished}`);
+  pulseContent += metricPill('TREND REACH', `${reachArrow} ${reachDeltaStr}`, reachColor);
+  if (pulse.accountAvgEr != null) {
+    pulseContent += metricPill('ER MEDIU CONT', `${pulse.accountAvgEr.toFixed(2)}%`, C.lime);
+  }
+  if (pulse.topPost) {
+    pulseContent += metricPill(
+      `TOP: "${(pulse.topPost.caption ?? '').slice(0, 35)}..."`,
+      `ER ${pulse.topPost.erByReach?.toFixed(2)}%`,
+      C.lime,
+    );
+  }
+  for (const alert of pulse.alertPosts) {
+    pulseContent += metricPill(
+      `⚠️ "${(alert.caption ?? '').slice(0, 35)}..."`,
+      alert.issue,
+      C.coral,
+    );
+  }
+
+  const highNews = news.filter(n => n.relevance === 'high').slice(0, 3);
+  const mediumNews = news.filter(n => n.relevance === 'medium').slice(0, 2);
+  const hasNews = highNews.length > 0 || mediumNews.length > 0;
+  const newsContent = [...highNews, ...mediumNews].map(newsCard).join('');
+
+  const urgentEvents = events.filter(e => e.urgency === 'urgent');
+  const plannedEvents = events.filter(e => e.urgency === 'planned');
+  const hasEvents = urgentEvents.length > 0 || plannedEvents.length > 0;
+  const eventsContent = [...urgentEvents, ...plannedEvents].map(eventCard).join('');
+
+  const sortedOpps = [...opportunities].sort((a, b) => a.priority - b.priority);
+  const oppsContent = sortedOpps.map(opportunityCard).join('');
+
+  // ── Final HTML ───────────────────────────────────────────────────────
+  const html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${C.bg};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.bg};">
+  <tr>
+    <td align="center" style="background-color:${C.bg};padding:32px 16px;">
+
+      <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;width:100%;background-color:${C.bg};">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:${C.bg};padding:0 0 20px 0;border-bottom:1px solid ${C.border};">
+            <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:700;letter-spacing:0.1em;color:${C.lime};">AI LICHIDITATE</p>
+            <p style="margin:4px 0 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;color:${C.textMuted};letter-spacing:0.06em;">${runLabelsFull[runType]} · ${dateStr.toUpperCase()}</p>
+          </td>
+        </tr>
+
+        <!-- ACCOUNT PULSE -->
+        <tr>
+          <td style="background-color:${C.bg};padding:24px 0 0 0;">
+            <p style="margin:0 0 10px 0;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:0.12em;color:${C.textMuted};text-transform:uppercase;">CONT · ULTIMELE ${runType === 'monday' ? '72H' : '48H'}</p>
+            ${pulseContent}
+          </td>
+        </tr>
+
+        ${hasNews ? `
+        <!-- NEWS -->
+        <tr>
+          <td style="background-color:${C.bg};padding:24px 0 0 0;">
+            <div style="height:1px;background-color:${C.border};margin-bottom:20px;"></div>
+            <p style="margin:0 0 10px 0;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:0.12em;color:${C.textMuted};text-transform:uppercase;">PIEȚE · ȘTIRI RELEVANTE</p>
+            ${newsContent}
+          </td>
+        </tr>` : ''}
+
+        ${hasEvents ? `
+        <!-- EVENTS -->
+        <tr>
+          <td style="background-color:${C.bg};padding:24px 0 0 0;">
+            <div style="height:1px;background-color:${C.border};margin-bottom:20px;"></div>
+            <p style="margin:0 0 10px 0;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:0.12em;color:${C.textMuted};text-transform:uppercase;">CALENDAR · EVENIMENTE</p>
+            ${eventsContent}
+          </td>
+        </tr>` : ''}
+
+        <!-- OPPORTUNITIES -->
+        <tr>
+          <td style="background-color:${C.bg};padding:24px 0 0 0;">
+            <div style="height:1px;background-color:${C.border};margin-bottom:20px;"></div>
+            <p style="margin:0 0 10px 0;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:0.12em;color:${C.textMuted};text-transform:uppercase;">OPORTUNITĂȚI CONȚINUT · ${opportunities.length} IDEI</p>
+            ${oppsContent}
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="background-color:${C.bg};padding:28px 0 0 0;">
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background-color:${C.lime};border-radius:4px;">
+                  <a href="${params.appUrl}/dashboard/agent"
+                     style="display:inline-block;padding:13px 28px;font-family:'Courier New',Courier,monospace;font-size:12px;font-weight:700;letter-spacing:0.1em;color:#000000;text-decoration:none;text-transform:uppercase;">
+                    → DESCHIDE DASHBOARD COMPLET
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:${C.bg};padding:28px 0 0 0;border-top:1px solid ${C.border};margin-top:28px;">
+            <p style="margin:28px 0 0 0;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.textMuted};">AI LICHIDITATE · Agent Proactiv · ${runLabelsFull[runType]}</p>
+            <p style="margin:4px 0 0 0;font-family:'Courier New',Courier,monospace;font-size:10px;color:${C.textMuted};">Următorul briefing: ${nextRunLabels[runType]}</p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>`;
+
+  // ── Plain text ───────────────────────────────────────────────────────
+  const text = [
+    `AI LICHIDITATE · ${runLabelsFull[runType]}`,
+    dateStr.toUpperCase(),
+    '='.repeat(50),
+    '',
+    `CONT · ULTIMELE 48H`,
+    `Postări: ${pulse.postsPublished} | Trend reach: ${reachArrow} ${reachDeltaStr}`,
+    pulse.accountAvgEr ? `ER mediu cont: ${pulse.accountAvgEr.toFixed(2)}%` : '',
+    pulse.alertPosts.map(p => `⚠️ ${p.issue}`).join('\n'),
+    '',
+    hasNews ? 'ȘTIRI:' : '',
+    ...highNews.map(n => `🔴 ${n.title}\n   ${n.summary} (${n.source})`),
+    '',
+    hasEvents ? 'EVENIMENTE:' : '',
+    ...urgentEvents.map(e => `⚡ ${e.event} — ${e.dateDescription}`),
+    ...plannedEvents.map(e => `📅 ${e.event} — ${e.dateDescription}`),
+    '',
+    'OPORTUNITĂȚI:',
+    ...sortedOpps.map((o, i) => [
+      `${i + 1}. [P${o.priority}] ${o.title}`,
+      `   Hook: "${o.hook}"`,
+      `   ${o.format} · ${o.theme.toUpperCase()} · ${o.bestTimeToPost}`,
+      `   ${o.rationale}`,
+    ].join('\n')),
+    '',
+    `Dashboard: ${params.appUrl}/dashboard/agent`,
+    `Următorul briefing: ${nextRunLabels[runType]}`,
+  ].filter(s => s !== '').join('\n');
+
+  return { subject, html, text };
 }
