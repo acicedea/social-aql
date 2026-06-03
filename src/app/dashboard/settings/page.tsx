@@ -1,5 +1,5 @@
 import React from 'react';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { activeThemeId } from '@/config/theme.config';
 import { Eyebrow, H2, Mono } from '@/components/design-system/Typography';
 import { colors } from '@/themes/platform/tokens';
@@ -18,6 +18,7 @@ export default async function SettingsPage() {
 
   const userProfile = await getCurrentUserRole();
   const adminUser = userProfile?.role === 'admin';
+  const db = createSupabaseServiceClient();
 
   const [
     { count: totalPosts },
@@ -25,8 +26,8 @@ export default async function SettingsPage() {
     viewers,
     pendingInvites,
   ] = await Promise.all([
-    supabase.from('posts').select('*', { count: 'exact', head: true }),
-    supabase.from('posts').select('*', { count: 'exact', head: true }).not('theme', 'is', null),
+    db.from('posts').select('*', { count: 'exact', head: true }),
+    db.from('posts').select('*', { count: 'exact', head: true }).not('theme', 'is', null),
     adminUser ? fetchViewersAction() : Promise.resolve([]),
     adminUser ? fetchPendingInvitesAction() : Promise.resolve([]),
   ]);
@@ -136,15 +137,17 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
-      <div>
-        <div style={{ marginTop: 32, marginBottom: 16 }}>
-          <H2>RE-CLASIFICARE TEME</H2>
+      {adminUser && (
+        <div>
+          <div style={{ marginTop: 32, marginBottom: 16 }}>
+            <H2>RE-CLASIFICARE TEME</H2>
+          </div>
+          <BackfillThemesSection
+            totalPosts={totalPosts ?? 0}
+            classifiedPosts={classifiedPosts ?? 0}
+          />
         </div>
-        <BackfillThemesSection
-          totalPosts={totalPosts ?? 0}
-          classifiedPosts={classifiedPosts ?? 0}
-        />
-      </div>
+      )}
 
       {adminUser && (
         <div>

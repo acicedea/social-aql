@@ -29,6 +29,7 @@ interface AiInsightsData {
 interface AiInsightsTabProps {
   data: AiInsightsData;
   accountId: string;
+  isAdmin: boolean;
 }
 
 // ─── Shared card styles ────────────────────────────────────────────────────────
@@ -57,11 +58,13 @@ function AnalysisCard({
   analysis,
   analysisType,
   accountId,
+  isAdmin,
 }: {
   eyebrow: string;
   analysis: AnalysisSummary | null;
   analysisType: 'weekly_summary' | 'content_patterns' | 'content_ideation';
   accountId: string;
+  isAdmin: boolean;
 }) {
   if (!analysis) {
     return (
@@ -72,9 +75,11 @@ function AnalysisCard({
             Nicio analiză generată încă.
           </span>
         </div>
-        <div style={{ marginTop: 16 }}>
-          <RunAnalysisButton analysisType={analysisType} accountId={accountId} />
-        </div>
+        {isAdmin && (
+          <div style={{ marginTop: 16 }}>
+            <RunAnalysisButton analysisType={analysisType} accountId={accountId} />
+          </div>
+        )}
       </div>
     );
   }
@@ -169,7 +174,7 @@ function AnalysisCard({
 
 // ─── AiInsightsTab ─────────────────────────────────────────────────────────────
 
-export function AiInsightsTab({ data, accountId }: AiInsightsTabProps) {
+export function AiInsightsTab({ data, accountId, isAdmin }: AiInsightsTabProps) {
   const completed = data.recentAnalyses.filter((a) => a.status === 'completed').length;
   const failed = data.recentAnalyses.filter((a) => a.status === 'failed').length;
   const avgDuration = (() => {
@@ -218,6 +223,7 @@ export function AiInsightsTab({ data, accountId }: AiInsightsTabProps) {
             analysis={cfg.analysis}
             analysisType={cfg.analysisType}
             accountId={accountId}
+            isAdmin={isAdmin}
           />
         ))}
       </div>

@@ -2,7 +2,7 @@ import 'server-only';
 import { classifyHookType, classifyCaptionLength, detectSaveCta } from '@/lib/content-analysis/caption-utils';
 import { analyzeRetention } from '@/lib/retention/retention-analyzer';
 import type { TranscriptionSegment } from '@/lib/transcription/types';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { THEMES } from '@/lib/themes/theme-keywords';
 
 // ─── Exported Interfaces ─────────────────────────────────────────────────────
@@ -462,12 +462,11 @@ export function buildDashboardParams(
 
 // ─── Exported: fetchUserAccounts ─────────────────────────────────────────────
 
-export async function fetchUserAccounts(userId: string): Promise<AccountOption[]> {
-  const supabase = await createSupabaseServerClient();
+export async function fetchUserAccounts(_userId: string): Promise<AccountOption[]> {
+  const supabase = createSupabaseServiceClient();
   const { data } = await supabase
     .from('accounts')
     .select('id, display_name, handle, provider_id, status, last_sync_at')
-    .eq('user_id', userId)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
   return (data ?? []).map(a => ({
@@ -483,7 +482,7 @@ export async function fetchUserAccounts(userId: string): Promise<AccountOption[]
 // ─── Exported: fetchOverviewData ─────────────────────────────────────────────
 
 export async function fetchOverviewData(params: DashboardParams): Promise<OverviewData> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   // 1. account details
   const { data: accountRow } = await supabase
@@ -679,7 +678,7 @@ export async function fetchOverviewData(params: DashboardParams): Promise<Overvi
 // ─── Exported: fetchPerformanceData ──────────────────────────────────────────
 
 export async function fetchPerformanceData(params: DashboardParams): Promise<PerformanceData> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const [{ data: postsRaw }, { data: followerSnaps }] = await Promise.all([
     supabase
@@ -793,7 +792,7 @@ export async function fetchPerformanceData(params: DashboardParams): Promise<Per
 // ─── Exported: fetchContentData ──────────────────────────────────────────────
 
 export async function fetchContentData(params: DashboardParams): Promise<ContentData> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const { data: raw } = await supabase
     .from('posts_with_latest_metrics')
@@ -901,12 +900,11 @@ export async function fetchContentData(params: DashboardParams): Promise<Content
 // ─── Exported: fetchAiInsightsData ───────────────────────────────────────────
 
 export async function fetchAiInsightsData(params: DashboardParams): Promise<AiInsightsData> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
 
   const { data: raw } = await supabase
     .from('ai_analyses')
     .select('id, analysis_type, status, created_at, structured_output, duration_ms')
-    .eq('user_id', params.userId)
     .eq('account_id', params.accountId)
     .order('created_at', { ascending: false })
     .limit(20);

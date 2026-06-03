@@ -1,7 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { colors } from '@/themes/platform/tokens';
 import { Eyebrow, H1, Body, Mono } from '@/components/design-system';
 import type { ContentOpportunity } from '@/lib/agent/types';
@@ -17,6 +17,7 @@ import {
   type AccountOption,
 } from '@/lib/dashboard/data';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
+import { getCurrentUserRole } from '@/lib/roles';
 
 interface Props {
   searchParams: Promise<{
@@ -162,7 +163,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     };
   }
 
-  const { count } = await supabase
+  const serviceClient = createSupabaseServiceClient();
+  const { count } = await serviceClient
     .from('posts')
     .select('id', { count: 'exact', head: true })
     .eq('account_id', activeAccount.id);
@@ -171,7 +173,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     return <EmptyStateNoPosts account={activeAccount} />;
   }
 
-  const [overviewData, performanceData, contentData, aiInsightsData, agentResult] = await Promise.all([
+  const [overviewData, performanceData, contentData, aiInsightsData, agentResult, userProfile] = await Promise.all([
     fetchOverviewData(dashParams),
     fetchPerformanceData(dashParams),
     fetchContentData(dashParams),
@@ -183,9 +185,11 @@ export default async function DashboardPage({ searchParams }: Props) {
       .order('run_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    getCurrentUserRole(),
   ]);
 
   const latestInsight = agentResult.data;
+  const isAdmin = userProfile?.role === 'admin';
 
   const dateLabel = isAllTime
     ? 'Toate'
@@ -249,6 +253,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         contentData={contentData}
         aiInsightsData={aiInsightsData}
         defaultTab={params.tab ?? 'overview'}
+        isAdmin={isAdmin}
       />
     </>
   );

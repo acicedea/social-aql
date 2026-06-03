@@ -1,5 +1,5 @@
 import React from 'react';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { listProviderManifests } from '@/config/providers.manifests';
 import { Eyebrow, H2 } from '@/components/design-system/Typography';
 import { AvailableProvidersGrid } from '@/components/providers/AvailableProvidersGrid';
@@ -18,9 +18,6 @@ export default async function AccountsPage({ searchParams }: Props) {
   const newlyConnectedId = params.connected ?? null;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   let newlyConnectedAccount: { id: string; handle: string } | null = null;
   if (newlyConnectedId) {
@@ -38,12 +35,12 @@ export default async function AccountsPage({ searchParams }: Props) {
     }
   }
 
+  const serviceClient = createSupabaseServiceClient();
   const [userProfile, { data: accounts }] = await Promise.all([
     getCurrentUserRole(),
-    supabase
+    serviceClient
       .from('accounts')
       .select('id, display_name, handle, provider_id, status, last_sync_at')
-      .eq('user_id', user!.id)
       .order('created_at', { ascending: false }),
   ]);
 

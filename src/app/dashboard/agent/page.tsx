@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { InsightCard } from '@/components/agent/InsightCard';
 import { Eyebrow, H1, Body, Mono } from '@/components/design-system';
@@ -9,10 +9,10 @@ export default async function AgentPage() {
 
   if (!user) redirect('/login');
 
-  const { data: insights } = await supabase
+  const db = createSupabaseServiceClient();
+  const { data: insights } = await db
     .from('agent_insights')
     .select('*')
-    .eq('user_id', user.id)
     .order('run_at', { ascending: false })
     .limit(10);
 

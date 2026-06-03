@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { colors } from '@/themes/platform/tokens';
 import { Eyebrow, H2, Mono } from '@/components/design-system/Typography';
 import { Tag } from '@/components/design-system/Tag';
@@ -43,17 +43,18 @@ export default async function PostsPage({
 
   if (!user) redirect('/login');
 
-  const { data: accounts } = await supabase
+  const db = createSupabaseServiceClient();
+
+  const { data: accounts } = await db
     .from('accounts')
-    .select('id')
-    .eq('user_id', user.id);
+    .select('id');
 
   const accountIds = (accounts ?? []).map((a: { id: string }) => a.id);
   if (!accountIds.length) {
     return renderGlobalEmpty();
   }
 
-  const { count: totalPostsCount } = await supabase
+  const { count: totalPostsCount } = await db
     .from('posts')
     .select('id', { count: 'exact', head: true })
     .in('account_id', accountIds);
@@ -76,12 +77,12 @@ export default async function PostsPage({
   const validSortCols = ['published_at', 'er_by_reach', 'saves_per_reach', 'sends_per_reach', 'reach'];
   const col = validSortCols.includes(sortCol) ? sortCol : 'published_at';
 
-  let countQuery = supabase
+  let countQuery = db
     .from('posts_with_latest_metrics')
     .select('id', { count: 'exact', head: true })
     .in('account_id', accountIds);
 
-  let dataQuery = supabase
+  let dataQuery = db
     .from('posts_with_latest_metrics')
     .select('*')
     .in('account_id', accountIds);
@@ -118,7 +119,7 @@ export default async function PostsPage({
   // Fetch transcription status for posts
   const postIds = (posts ?? []).map(p => p.id);
   const { data: transcriptionJobs } = postIds.length > 0
-    ? await supabase
+    ? await db
         .from('transcription_jobs')
         .select('post_id, status')
         .in('post_id', postIds)

@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { AnalysisDetail } from '@/components/analyses/AnalysisDetail';
 import { colors } from '@/themes/platform/tokens';
 import { Mono } from '@/components/design-system/Typography';
@@ -18,11 +18,11 @@ export default async function AnalysisDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: analysis } = await supabase
+  const db = createSupabaseServiceClient();
+  const { data: analysis } = await db
     .from('ai_analyses')
     .select('id, analysis_type, status, structured_output, output_markdown, created_at, input_range_from, input_range_to, model, tokens_used, duration_ms, error_message')
     .eq('id', id)
-    .eq('user_id', user!.id)
     .single();
 
   if (!analysis) notFound();
@@ -32,7 +32,7 @@ export default async function AnalysisDetailPage({
   if (analysis.analysis_type === 'post_critique' && analysis.structured_output) {
     const postId = (analysis.structured_output as Record<string, unknown>).postId as string | undefined;
     if (postId) {
-      const { data: post } = await supabase
+      const { data: post } = await db
         .from('posts_with_latest_metrics')
         .select('id, caption, permalink')
         .eq('id', postId)

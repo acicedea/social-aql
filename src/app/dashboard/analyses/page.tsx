@@ -1,5 +1,5 @@
 import React from 'react';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { getCurrentUserRole } from '@/lib/roles';
 import { Eyebrow, H1, Body, Mono } from '@/components/design-system/Typography';
 import { RunAnalysisButton } from '@/components/analyses/RunAnalysisButton';
@@ -42,18 +42,17 @@ export default async function AnalysesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const db = createSupabaseServiceClient();
   const [userProfile, { data: accounts }, { data: analyses }] = await Promise.all([
     getCurrentUserRole(),
-    supabase
+    db
       .from('accounts')
       .select('id, display_name, handle')
-      .eq('user_id', user!.id)
       .eq('status', 'active')
       .order('created_at', { ascending: true }),
-    supabase
+    db
       .from('ai_analyses')
       .select('id, analysis_type, status, created_at, structured_output, error_message')
-      .eq('user_id', user!.id)
       .neq('status', 'failed')
       .order('created_at', { ascending: false })
       .limit(50),

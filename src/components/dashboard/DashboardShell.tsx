@@ -25,6 +25,7 @@ interface DashboardShellProps {
   contentData: ContentData;
   aiInsightsData: AiInsightsData;
   defaultTab: string;
+  isAdmin: boolean;
 }
 
 export function DashboardShell({
@@ -36,6 +37,7 @@ export function DashboardShell({
   contentData,
   aiInsightsData,
   defaultTab,
+  isAdmin,
 }: DashboardShellProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -119,7 +121,7 @@ export function DashboardShell({
           ...(isEnabled('aiInsightsTab') ? [{
             key: 'ai',
             label: 'ANALIZE AI',
-            children: <AiInsightsTab data={aiInsightsData} accountId={account.id} />,
+            children: <AiInsightsTab data={aiInsightsData} accountId={account.id} isAdmin={isAdmin} />,
           }] : []),
         ]}
         tabBarStyle={{

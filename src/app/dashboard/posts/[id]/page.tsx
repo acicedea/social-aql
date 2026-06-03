@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { colors } from '@/themes/platform/tokens';
 import { Eyebrow, H2, Body, Mono } from '@/components/design-system/Typography';
 import { Card } from '@/components/design-system/Card';
@@ -46,8 +46,10 @@ export default async function PostDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Fetch post via the view (RLS enforced via underlying posts table)
-  const { data: post, error } = await supabase
+  const db = createSupabaseServiceClient();
+
+  // Fetch post via the view
+  const { data: post, error } = await db
     .from('posts_with_latest_metrics')
     .select('*')
     .eq('id', id)
@@ -58,14 +60,14 @@ export default async function PostDetailPage({
   }
 
   // Fetch all metric snapshots for timeline
-  const { data: snapshots } = await supabase
+  const { data: snapshots } = await db
     .from('post_metrics_snapshots')
     .select('captured_at, reach, er_by_reach, saves_per_reach, sends_per_reach')
     .eq('post_id', id)
     .order('captured_at', { ascending: true });
 
   // Account averages for benchmarking
-  const { data: accountPosts } = await supabase
+  const { data: accountPosts } = await db
     .from('posts_with_latest_metrics')
     .select('er_by_reach, saves_per_reach, sends_per_reach, caption')
     .eq('account_id', (post as Record<string, unknown>).account_id as string)
@@ -131,7 +133,7 @@ export default async function PostDetailPage({
 
   const diagnosticResult = runPostDiagnostics(diagnosticInput);
 
-  const { data: transcriptionJob } = await supabase
+  const { data: transcriptionJob } = await db
     .from('transcription_jobs')
     .select('status')
     .eq('post_id', post.id)
@@ -161,7 +163,7 @@ export default async function PostDetailPage({
   }) : null;
 
   // Fetch existing AI critique
-  const { data: existingCritiqueRow } = await supabase
+  const { data: existingCritiqueRow } = await db
     .from('ai_analyses')
     .select('structured_output')
     .eq('analysis_type', 'post_critique')

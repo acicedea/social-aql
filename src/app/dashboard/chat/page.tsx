@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 
@@ -12,11 +12,11 @@ export default async function ChatPage({ searchParams }: Props) {
   if (!user) redirect('/login');
 
   const params = await searchParams;
+  const db = createSupabaseServiceClient();
 
-  const { data: accounts } = await supabase
+  const { data: accounts } = await db
     .from('accounts')
     .select('id, display_name, handle, provider_id, status')
-    .eq('user_id', user.id)
     .eq('status', 'active')
     .order('created_at');
 
@@ -29,7 +29,7 @@ export default async function ChatPage({ searchParams }: Props) {
 
   let initialMessages: Array<{ id: string; role: string; content: string; created_at: string }> = [];
   if (params.conversation) {
-    const { data: msgs } = await supabase
+    const { data: msgs } = await db
       .from('chat_messages')
       .select('id, role, content, created_at')
       .eq('conversation_id', params.conversation)
