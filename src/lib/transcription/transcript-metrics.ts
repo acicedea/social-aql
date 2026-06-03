@@ -6,31 +6,7 @@ import type {
   CtaPosition,
   RhythmQuality,
 } from './transcript-metrics-types';
-
-// ── Constants ────────────────────────────────────────────────────────
-
-const FINANCIAL_KEYWORDS = [
-  'fed', 'federal reserve', 'bce', 'fomc', 'powell', 'lagarde',
-  'dobândă', 'dobanda', 'rata dobânzii', 'rata dobanzii',
-  'inflație', 'inflatie', 'deflație', 'deflatie',
-  'pib', 'gdp', 'recesiune', 'recession',
-  'lichiditate', 'liquidity', 'spread',
-  'bitcoin', 'btc', 'ethereum', 'eth', 'crypto', 'cripto',
-  's&p', 'sp500', 'nasdaq', 'dow', 'wall street',
-  'nvidia', 'nvda', 'apple', 'aapl', 'microsoft',
-  'aur', 'xau', 'gold', 'argint', 'silver',
-  'dxy', 'dolar', 'dollar', 'eur/usd', 'forex',
-  'imobiliar', 'ipotecă', 'ipoteca', 'mortgage',
-  'obligațiuni', 'obligatiuni', 'bonds', 'yield',
-  'portofoliu', 'portfolio', 'diversificare', 'risc',
-  'bull market', 'bear market', 'bullish', 'bearish',
-  'breakout', 'rezistență', 'rezistenta', 'suport',
-  'randament', 'dividend', 'profit', 'pierdere',
-  'piețe emergente', 'piete emergente', 'emerging markets',
-  'capitalul', 'capital', 'investiție', 'investitie',
-  'tapering', 'qe', 'quantitative easing',
-  'trezorerie', 'treasury', 't-bills',
-];
+import forkConfig from '../../../fork-config';
 
 const CTA_PATTERNS_SAVE = /salvează|salvati|save this|bookmark|păstrează/i;
 const CTA_PATTERNS_FOLLOW = /urmărește|urmareste|follow|abonează|aboneaza|subscribe/i;
@@ -240,7 +216,7 @@ function analyzeContent(transcript: string) {
   const lower = transcript.toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-  const foundKeywords = FINANCIAL_KEYWORDS.filter(kw =>
+  const foundKeywords = forkConfig.contentNiche.keywords.filter(kw =>
     lower.includes(kw.normalize('NFD').replace(/[̀-ͯ]/g, ''))
   );
 

@@ -51,5 +51,6 @@ export interface ForkConfig {
     label: string;
     description: string;
     themes: string[];
+    keywords: string[];
   };
 }

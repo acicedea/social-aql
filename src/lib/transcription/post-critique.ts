@@ -3,6 +3,7 @@ import { getDefaultAiProvider } from '@/ai/registry';
 import { AiProviderError } from '@/ai/providers/types';
 import type { TranscriptMetrics } from './transcript-metrics-types';
 import type { TranscriptionSegment } from './types';
+import forkConfig from '../../../fork-config';
 
 export interface PostCritique {
   overallVerdict: string;
@@ -140,7 +141,7 @@ ${input.visualDescription ?? '(nedisponibil)'}
 - CTA text: "${input.metrics.ctaText ?? 'absent'}"
 - Ritm: ${input.metrics.rhythmQuality} (avg segment ${input.metrics.avgSegmentDurationSeconds.toFixed(1)}s)
 - Segment cel mai lung: ${input.metrics.longestSegmentSeconds.toFixed(1)}s — "${input.metrics.longestSegmentText.slice(0, 80)}"
-- Keywords financiare: ${input.metrics.financialKeywords.length} (${(input.metrics.financialKeywordDensity * 100).toFixed(1)}% densitate)
+- Keywords ${forkConfig.contentNiche.label}: ${input.metrics.financialKeywords.length} (${(input.metrics.financialKeywordDensity * 100).toFixed(1)}% densitate)
 - Keywords detectate: ${input.metrics.financialKeywords.slice(0, 10).join(', ')}
 - Overall metric score: ${input.metrics.overallScore}/100
 
