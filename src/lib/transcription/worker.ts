@@ -245,6 +245,8 @@ export async function runTranscriptionWorker(): Promise<WorkerResult> {
           .from('transcription_jobs')
           .update({
             status: 'pending',
+            // Roll back the attempt increment — rate limits aren't the job's fault
+            attempts: job.attempts,
             last_error_code: '429',
             retry_after: retryAfter.toISOString(),
             error_message: `Rate limited at ${now.toISOString()}. Retry after ${retryAfter.toISOString()}`,
